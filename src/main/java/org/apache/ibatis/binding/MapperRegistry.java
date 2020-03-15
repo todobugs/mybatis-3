@@ -1,5 +1,5 @@
 /**
- *    Copyright 2009-2019 the original author or authors.
+ *    Copyright 2009-2020 the original author or authors.
  *
  *    Licensed under the Apache License, Version 2.0 (the "License");
  *    you may not use this file except in compliance with the License.
@@ -56,6 +56,11 @@ public class MapperRegistry {
   public <T> boolean hasMapper(Class<T> type) {
     return knownMappers.containsKey(type);
   }
+
+  /**
+   * 判断是否为接口，是的话才会帮忙生成代理对象
+   * 后续会在运行时该代理对象会被拦截器进行拦截处理
+   */
 
   public <T> void addMapper(Class<T> type) {
     if (type.isInterface()) {

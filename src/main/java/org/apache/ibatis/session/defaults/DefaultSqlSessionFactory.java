@@ -1,5 +1,5 @@
 /**
- *    Copyright 2009-2019 the original author or authors.
+ *    Copyright 2009-2020 the original author or authors.
  *
  *    Licensed under the Apache License, Version 2.0 (the "License");
  *    you may not use this file except in compliance with the License.
@@ -90,9 +90,13 @@ public class DefaultSqlSessionFactory implements SqlSessionFactory {
   private SqlSession openSessionFromDataSource(ExecutorType execType, TransactionIsolationLevel level, boolean autoCommit) {
     Transaction tx = null;
     try {
+      //获取配置信息中的environment信息
       final Environment environment = configuration.getEnvironment();
+      //根据environment获取事务工厂，配置文件中设置的值为JDBC，表示的是有mybatis框架进行管理
       final TransactionFactory transactionFactory = getTransactionFactoryFromEnvironment(environment);
+      //创建一个事务
       tx = transactionFactory.newTransaction(environment.getDataSource(), level, autoCommit);
+
       final Executor executor = configuration.newExecutor(tx, execType);
       return new DefaultSqlSession(configuration, executor, autoCommit);
     } catch (Exception e) {

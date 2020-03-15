@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!--
+
+       Copyright 2009-2020 the original author or authors.
+
+       Licensed under the Apache License, Version 2.0 (the "License");
+       you may not use this file except in compliance with the License.
+       You may obtain a copy of the License at
+
+          http://www.apache.org/licenses/LICENSE-2.0
+
+       Unless required by applicable law or agreed to in writing, software
+       distributed under the License is distributed on an "AS IS" BASIS,
+       WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+       See the License for the specific language governing permissions and
+       limitations under the License.
+
+-->
+<!DOCTYPE configuration
+  PUBLIC "-//mybatis.org//DTD Config 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-config.dtd">
+<!--configuration各配置节点是有顺序要求的-->
+<!--详细配置请参看：https://mybatis.org/mybatis-3/zh/configuration.html-->
+<configuration>
+  <!--属性-->
+  <properties resource="db.properties">
+  </properties>
+  <!--设置-->
+  <!--<settings>
+    <setting name="" value=""/>
+  </settings>-->
+  <!--类型别名-->
+  <typeAliases >
+    <package name="org.apache.ibatis.todobugs.entity"/>
+  </typeAliases>
+  <!--类型处理器-->
+  <!--<typeHandlers>
+    用户自定义类型转换器，比如将Integer转boolean等
+    <typeHandler handler="org.apache.ibatis.type.StringTypeHandler" jdbcType="INTEGER" javaType="java.lang.Integer"/>
+  </typeHandlers>-->
+
+  <!--对象工厂，ibatis提供的默认对象工厂为DefaultObjectFactory-->
+  <!--用户自定义工厂只需要继承 DefaultObjectFactory 即可，从而对生成的java对象添加数据库中不存在的属性-->
+  <!--<objectFactory type="org.apache.ibatis.reflection.factory.DefaultObjectFactory"/>-->
+
+  <!--对象包装工厂-->
+  <!--<objectWrapperFactory type=""/>-->
+  <!--反射工厂-->
+  <!--<reflectorFactory type=""/>-->
+
+  <!-- 插件，其实即使代理模式 -->
+  <!--对于Executor，Mybatis提供四种拦截器实现:BatchExecutor,ReuseExecutor,SimpleExecutor,CachingExecutor-->
+  <!--<plugins>
+    <plugin interceptor="org.apache.ibatis.plugin.MyInterceptor"></plugin>
+  </plugins>-->
+
+  <!--简化版只需要environments,mappers-->
+  <environments default="development">
+    <!--环境变量-->
+    <environment id="development">
+      <!--事务管理器-->
+      <transactionManager type="JDBC"/>
+      <!--数据源-->
+      <dataSource type="POOLED">
+<!--        <property name="driver" value="com.mysql.jdbc.Driver"/>
+        <property name="url" value="jdbc:mysql://192.168.1.87:3306/okex"/>
+        <property name="username" value="root"/>
+        <property name="password" value="password"/>-->
+        <property name="driver" value="${jdbc.driver}"/>
+        <property name="url" value="${jdbc.url}"/>
+        <property name="username" value="${jdbc.username}"/>
+        <property name="password" value="${jdbc.password}"/>
+      </dataSource>
+    </environment>
+  </environments>
+  <!--数据库厂商标识-->
+  <!--<databaseIdProvider type="">
+    <property name="" value=""/>
+  </databaseIdProvider>-->
+
+  <mappers>
+<!--    <package name=""/>-->
+    <!--Mybatis mapper加载方式：1-package ;1-resource,2-class,3-url -->
+    <mapper resource="mapper/userMapper.xml"/>
+<!--    <mapper class=""/>-->
+<!--    <mapper url=""/>-->
+  </mappers>
+
+</configuration>

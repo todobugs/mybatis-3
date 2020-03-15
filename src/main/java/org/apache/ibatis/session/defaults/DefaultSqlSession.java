@@ -1,5 +1,5 @@
 /**
- *    Copyright 2009-2019 the original author or authors.
+ *    Copyright 2009-2020 the original author or authors.
  *
  *    Licensed under the Apache License, Version 2.0 (the "License");
  *    you may not use this file except in compliance with the License.
@@ -47,11 +47,10 @@ import org.apache.ibatis.session.SqlSession;
  */
 public class DefaultSqlSession implements SqlSession {
 
-  private final Configuration configuration;
-  private final Executor executor;
-
-  private final boolean autoCommit;
-  private boolean dirty;
+  private final Configuration configuration;//配置文件信息
+  private final Executor executor;//执行器
+  private final boolean autoCommit;//是否自动提交
+  private boolean dirty;//false-回滚，true-提交
   private List<Cursor<?>> cursorList;
 
   public DefaultSqlSession(Configuration configuration, Executor executor, boolean autoCommit) {

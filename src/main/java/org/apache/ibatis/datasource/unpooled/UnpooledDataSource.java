@@ -1,5 +1,5 @@
 /**
- *    Copyright 2009-2019 the original author or authors.
+ *    Copyright 2009-2020 the original author or authors.
  *
  *    Licensed under the Apache License, Version 2.0 (the "License");
  *    you may not use this file except in compliance with the License.
@@ -92,6 +92,7 @@ public class UnpooledDataSource implements DataSource {
 
   @Override
   public Connection getConnection() throws SQLException {
+    System.out.println("执行获取数据库连接************ 用户名："+username+"密码："+password);
     return doGetConnection(username, password);
   }
 
@@ -224,6 +225,7 @@ public class UnpooledDataSource implements DataSource {
   }
 
   private synchronized void initializeDriver() throws SQLException {
+    System.out.println("**************** driver："+driver);
     if (!registeredDrivers.containsKey(driver)) {
       Class<?> driverType;
       try {
