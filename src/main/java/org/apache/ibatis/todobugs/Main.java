@@ -30,16 +30,10 @@ public class Main {
     InputStream is = Resources.getResourceAsStream("mybatis-config.xml");
     SqlSessionFactory sessionFactory = new SqlSessionFactoryBuilder().build(is);
     SqlSession session = sessionFactory.openSession();
-    /* 插入数据
-    UserInfo user = new UserInfo();
-    user.setId(2);
-    user.setUserName("zhang");
-    user.setAge(2);
-    session.insert("insertUser",user);
-    session.commit();
-    */
 
     UserInfo userInfo = session.selectOne("selectUserById",1);
     System.out.println(userInfo.toString());
+
+//    System.out.println(Main.class.getClassLoader());
   }
 }

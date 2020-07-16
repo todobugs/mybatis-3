@@ -20,15 +20,14 @@
 <mapper namespace="org.apache.ibatis.todobugs.dao.UserDao">
   <resultMap id="BaseResult" type="UserInfo">
     <result column="id" property="id" jdbcType="INTEGER"  />
-    <result column="username" property="username" jdbcType="INTEGER" />
     <result column="age" property="age" jdbcType="INTEGER" />
   </resultMap>
 
   <insert id="insertUser" parameterType="UserInfo">
-    insert into user_info (id,username,age) values (#{id,jdbcType=INTEGER},#{username,jdbcType=VARCHAR},#{age,jdbcType=INTEGER})
+    insert into sso_user (id,username,age) values (#{id,jdbcType=INTEGER},#{username,jdbcType=VARCHAR},#{age,jdbcType=INTEGER})
   </insert>
   <select id="selectUserById" parameterType="java.lang.Integer" resultMap="BaseResult">
-    select * from user_info  where id = #{id,jdbcType=INTEGER}
+    select * from sso_user  where id = #{id,jdbcType=INTEGER}
   </select>
 
 </mapper>

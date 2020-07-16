@@ -74,6 +74,7 @@ public class SqlSessionFactoryBuilder {
 
   public SqlSessionFactory build(InputStream inputStream, String environment, Properties properties) {
     try {
+      //此处实例化XMLConfigBuilder，同时在XMLConfigBuilder中，创建 Configuration 实例对象，并在Configuration实例化时，注册各种注册器
       XMLConfigBuilder parser = new XMLConfigBuilder(inputStream, environment, properties);
       return build(parser.parse());
     } catch (Exception e) {
