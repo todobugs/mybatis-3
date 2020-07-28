@@ -44,12 +44,14 @@ public class MapperProxy<T> implements InvocationHandler, Serializable {
   private final Class<T> mapperInterface;
   private final Map<Method, MapperMethodInvoker> methodCache;
 
+  /** MapperProxy构造方法，被MapperProxyFactory调用用于实例化代理对象 */
   public MapperProxy(SqlSession sqlSession, Class<T> mapperInterface, Map<Method, MapperMethodInvoker> methodCache) {
     this.sqlSession = sqlSession;
     this.mapperInterface = mapperInterface;
     this.methodCache = methodCache;
   }
 
+  /** 静态代码块初始化合适的MethodHandler */
   static {
     Method privateLookupIn;
     try {
@@ -75,7 +77,7 @@ public class MapperProxy<T> implements InvocationHandler, Serializable {
     }
     lookupConstructor = lookup;
   }
-
+  /** 调用（根据method的类型声明判断方法调用类型） */
   @Override
   public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
     try {
@@ -88,7 +90,7 @@ public class MapperProxy<T> implements InvocationHandler, Serializable {
       throw ExceptionUtil.unwrapThrowable(t);
     }
   }
-
+  /** 缓存调用 */
   private MapperMethodInvoker cachedInvoker(Object proxy, Method method, Object[] args) throws Throwable {
     try {
       return methodCache.computeIfAbsent(method, m -> {
@@ -112,7 +114,7 @@ public class MapperProxy<T> implements InvocationHandler, Serializable {
       throw cause == null ? re : cause;
     }
   }
-
+  /** jdk1.9下调用 */
   private MethodHandle getMethodHandleJava9(Method method)
       throws NoSuchMethodException, IllegalAccessException, InvocationTargetException {
     final Class<?> declaringClass = method.getDeclaringClass();
@@ -120,17 +122,19 @@ public class MapperProxy<T> implements InvocationHandler, Serializable {
         declaringClass, method.getName(), MethodType.methodType(method.getReturnType(), method.getParameterTypes()),
         declaringClass);
   }
-
+  /** jdk1.8下调用 */
   private MethodHandle getMethodHandleJava8(Method method)
       throws IllegalAccessException, InstantiationException, InvocationTargetException {
     final Class<?> declaringClass = method.getDeclaringClass();
     return lookupConstructor.newInstance(declaringClass, ALLOWED_MODES).unreflectSpecial(method, declaringClass);
   }
 
+  /** 内部接口MapperMethodInvoker */
   interface MapperMethodInvoker {
     Object invoke(Object proxy, Method method, Object[] args, SqlSession sqlSession) throws Throwable;
   }
 
+  /** MapperMethodInvoker接口PlainMethodInvoker实现 */
   private static class PlainMethodInvoker implements MapperMethodInvoker {
     private final MapperMethod mapperMethod;
 
@@ -141,10 +145,12 @@ public class MapperProxy<T> implements InvocationHandler, Serializable {
 
     @Override
     public Object invoke(Object proxy, Method method, Object[] args, SqlSession sqlSession) throws Throwable {
+      /** 调用MapperMethod中的excute方法 */
       return mapperMethod.execute(sqlSession, args);
     }
   }
 
+  /** MapperMethodInvoker接口 DefaultMethodInvoker 实现 */
   private static class DefaultMethodInvoker implements MapperMethodInvoker {
     private final MethodHandle methodHandle;
 

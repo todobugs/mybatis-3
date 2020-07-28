@@ -42,6 +42,9 @@ public final class Environment {
     this.dataSource = dataSource;
   }
 
+  /**
+   * 静态内部类，采用建造者模式
+   */
   public static class Builder {
     private final String id;
     private TransactionFactory transactionFactory;

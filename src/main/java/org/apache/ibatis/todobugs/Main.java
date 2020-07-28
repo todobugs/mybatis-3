@@ -22,17 +22,28 @@ import org.apache.ibatis.session.SqlSessionFactoryBuilder;
 import org.apache.ibatis.todobugs.entity.UserInfo;
 
 import java.io.InputStream;
+import java.lang.invoke.MethodHandles;
+import java.lang.reflect.Method;
 
 public class Main {
 
   public static void main(String[] args) throws Exception{
 
+    Method privateLookupIn;
+    try {
+      privateLookupIn = MethodHandles.class.getMethod("privateLookupIn", Class.class, MethodHandles.Lookup.class);
+      System.out.printf("+++++++++++++++");
+    } catch (NoSuchMethodException e) {
+      System.out.printf("--------------");
+      privateLookupIn = null;
+    }
+/*
     InputStream is = Resources.getResourceAsStream("mybatis-config.xml");
     SqlSessionFactory sessionFactory = new SqlSessionFactoryBuilder().build(is);
     SqlSession session = sessionFactory.openSession();
 
     UserInfo userInfo = session.selectOne("selectUserById",1);
-    System.out.println(userInfo.toString());
+    System.out.println(userInfo.toString());*/
 
 //    System.out.println(Main.class.getClassLoader());
   }

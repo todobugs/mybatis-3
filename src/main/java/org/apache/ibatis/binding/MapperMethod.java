@@ -54,6 +54,10 @@ public class MapperMethod {
     this.method = new MethodSignature(config, mapperInterface, method);
   }
 
+  /** MapperMethod 核心执行逻辑根据command类型：
+   *  insert、update、delete 分别调用对应的执行命令，同时调用rowCountResult 返回受影响的条数
+   *  select操作，其执行会根据是否有结果处理器及返回数据类型调用不同的方法
+   */
   public Object execute(SqlSession sqlSession, Object[] args) {
     Object result;
     switch (command.getType()) {
@@ -216,6 +220,7 @@ public class MapperMethod {
 
   }
 
+  /** sqlCommand执行命令对象 */
   public static class SqlCommand {
 
     private final String name;
@@ -226,6 +231,10 @@ public class MapperMethod {
       final Class<?> declaringClass = method.getDeclaringClass();
       MappedStatement ms = resolveMappedStatement(mapperInterface, methodName, declaringClass,
           configuration);
+      /** 判断ms是否为null
+       *  1、如果不为null，则获取对应的sql id 和执行类型并赋值给name、type
+       *  2、如果为null，则再次判断执行方法上是否有注解Flush，如果有则name设置为null，type设置为FLUSH；否则抛出BindingException
+       */
       if (ms == null) {
         if (method.getAnnotation(Flush.class) != null) {
           name = null;
@@ -251,6 +260,12 @@ public class MapperMethod {
       return type;
     }
 
+    /**
+     * 1、根据接口全路径名及方法名组装成statementId
+     * 2、判断configuration 中是否存在该mappedStatement，若存在则直接返回
+     * 3、如果不存在则从父类接口中继续查找，如果找不到则返回null
+     * 4、如果入参路径就是方法所在的路径，则直接返回null
+     */
     private MappedStatement resolveMappedStatement(Class<?> mapperInterface, String methodName,
         Class<?> declaringClass, Configuration configuration) {
       String statementId = mapperInterface.getName() + "." + methodName;
@@ -273,18 +288,28 @@ public class MapperMethod {
   }
 
   public static class MethodSignature {
-
+    /** 是否返回多值 */
     private final boolean returnsMany;
+    /** 是否返回map */
     private final boolean returnsMap;
+    /** 是否返回void类型 */
     private final boolean returnsVoid;
+    /** 是否返回cursor */
     private final boolean returnsCursor;
+    /** 是否返回optional */
     private final boolean returnsOptional;
+    /** 返回类型 */
     private final Class<?> returnType;
+    /** map主键 */
     private final String mapKey;
+    /** 返回结果的handler索引 */
     private final Integer resultHandlerIndex;
+    /** 返回rowBound索引 */
     private final Integer rowBoundsIndex;
+    /** 参数名称解析器 */
     private final ParamNameResolver paramNameResolver;
 
+    /** 构造函数，主要对属性进行赋值 */
     public MethodSignature(Configuration configuration, Class<?> mapperInterface, Method method) {
       Type resolvedReturnType = TypeParameterResolver.resolveReturnType(method, mapperInterface);
       if (resolvedReturnType instanceof Class<?>) {
@@ -373,6 +398,7 @@ public class MapperMethod {
       return index;
     }
 
+    /** 判断method的返回类型是否有注解主键，有则返回该主键value，没有返回null */
     private String getMapKey(Method method) {
       String mapKey = null;
       if (Map.class.isAssignableFrom(method.getReturnType())) {
