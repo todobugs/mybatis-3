@@ -21,9 +21,16 @@ import javax.sql.DataSource;
 /**
  * @author Clinton Begin
  */
+
+/**
+ * 数据源工厂接口类，只提供两个方法：
+ * 1.设置相关配置属性
+ * 2.获取数据源
+ * 3.该接口有三个实现类：PooledDataSourceFactory,UnpooledDataSourceFactory,JndiDataSourceFactory
+ */
 public interface DataSourceFactory {
 
-  //设置属性
+  //设置属性（其目的是位datasource填充配置属性）
   void setProperties(Properties props);
 
   //获取数据源对象

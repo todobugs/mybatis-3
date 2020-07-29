@@ -29,6 +29,10 @@ import org.apache.ibatis.datasource.DataSourceFactory;
 /**
  * @author Clinton Begin
  */
+
+/**
+ * Jndi数据源工厂类
+ */
 public class JndiDataSourceFactory implements DataSourceFactory {
 
   public static final String INITIAL_CONTEXT = "initial_context";
@@ -37,6 +41,15 @@ public class JndiDataSourceFactory implements DataSourceFactory {
 
   private DataSource dataSource;
 
+  /**
+   * 根据传入的properties传入的属性，获取以"env."开头的键值对属性，并存入env 对象中
+   * 如果env为null，则调用InitialContext无参构造函数
+   * 如果env不为null，则根据调用InitialContext 有参构造函数将env对象传入，进行初始化。
+   *
+   * 若传入的properties中存在initial_context属性，且存在data_source属性，则先根据initial_context作为key通过initCtx进行查找。
+   *    然后根据查找出的ctx对象继续以data_source为key进行查找，并将返回的对象转换为DataSource数据源
+   * 否则 如果properties中包含data_source 的key，则直接调用initCtx获取对象并返回DataSource数据源
+   * */
   @Override
   public void setProperties(Properties properties) {
     try {
@@ -66,6 +79,10 @@ public class JndiDataSourceFactory implements DataSourceFactory {
     return dataSource;
   }
 
+  /**
+   * 根据properties中属性信息获取以"env."开头的配置信息，并将其（去除"env."的key）键值对添加到contextProperties中
+   *
+   */
   private static Properties getEnvProperties(Properties allProps) {
     final String PREFIX = ENV_PREFIX;
     Properties contextProperties = null;
