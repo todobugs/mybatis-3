@@ -7,8 +7,8 @@
     <node x="479.7" y="303.0">org.apache.ibatis.builder.SqlSourceBuilder.ParameterMappingTokenHandler</node>
     <node x="267.70000000000005" y="303.0">org.apache.ibatis.scripting.xmltags.XMLScriptBuilder</node>
     <node x="170.02179487179484" y="222.0">org.apache.ibatis.session.Configuration</node>
-    <node x="22.464743589743648" y="394.0">org.apache.ibatis.builder.xml.XMLConfigBuilder</node>
     <node x="239.02179487179478" y="0.0">org.apache.ibatis.builder.BaseBuilder</node>
+    <node x="22.464743589743648" y="394.0">org.apache.ibatis.builder.xml.XMLConfigBuilder</node>
     <node x="575.3929487179488" y="394.0">org.apache.ibatis.builder.SqlSourceBuilder</node>
     <node x="77.52179487179484" y="141.0">org.apache.ibatis.builder.xml.XMLStatementBuilder</node>
   </nodes>
