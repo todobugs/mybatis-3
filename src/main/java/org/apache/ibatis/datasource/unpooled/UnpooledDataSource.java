@@ -38,19 +38,20 @@ import org.apache.ibatis.io.Resources;
  */
 public class UnpooledDataSource implements DataSource {
 
-  private ClassLoader driverClassLoader;
-  private Properties driverProperties;
-  private static Map<String, Driver> registeredDrivers = new ConcurrentHashMap<>();
+  private ClassLoader driverClassLoader; //driver的类加载器
+  private Properties driverProperties; //数据库相关的驱动配置信息
+  private static Map<String, Driver> registeredDrivers = new ConcurrentHashMap<>(); //从DriverManager中已注册的驱动复制而来
 
-  private String driver;
-  private String url;
-  private String username;
-  private String password;
+  private String driver; //驱动类全路径名称
+  private String url; //数据库连接地址
+  private String username; //数据库用户名
+  private String password; //数据库密码
 
-  private Boolean autoCommit;
-  private Integer defaultTransactionIsolationLevel;
-  private Integer defaultNetworkTimeout;
+  private Boolean autoCommit; //是否自动提交
+  private Integer defaultTransactionIsolationLevel; //事务隔离级别
+  private Integer defaultNetworkTimeout; //默认网络超时时间
 
+  /** 初始化注册的驱动 */
   static {
     Enumeration<Driver> drivers = DriverManager.getDrivers();
     while (drivers.hasMoreElements()) {
@@ -218,12 +219,24 @@ public class UnpooledDataSource implements DataSource {
   }
 
   private Connection doGetConnection(Properties properties) throws SQLException {
+    //初始化驱动
     initializeDriver();
+    //根据数据库地址及相关属性获取connection
     Connection connection = DriverManager.getConnection(url, properties);
+    //设置connection其他属性值，比如网络超时时间、是否自动提交、事务隔离级别等
     configureConnection(connection);
+    //返回connection对象
     return connection;
   }
 
+  /**
+   * 初始化驱动：
+   * 1、首先判断registeredDrivers是否已存在UnpooledDataSource定义的driver属性
+   * 2、如果不存在
+   *    2.1、如果driverClassLoader 不为空，则通过驱动类加载器获取驱动类型；否则通过Resources.classForName获取
+   *    2.2、根据驱动类类型创建对应的driver实例，并将该driver实例的代理对象添加到DriverManager以及registeredDrivers中
+   * 否则抛出驱动类初始化异常
+   */
   private synchronized void initializeDriver() throws SQLException {
     System.out.println("**************** driver："+driver);
     if (!registeredDrivers.containsKey(driver)) {
@@ -245,6 +258,7 @@ public class UnpooledDataSource implements DataSource {
     }
   }
 
+  /** 设置connection其他属性值，比如网络超时时间、是否自动提交、事务隔离级别等 */
   private void configureConnection(Connection conn) throws SQLException {
     if (defaultNetworkTimeout != null) {
       conn.setNetworkTimeout(Executors.newSingleThreadExecutor(), defaultNetworkTimeout);

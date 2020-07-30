@@ -28,15 +28,7 @@ import java.lang.reflect.Method;
 public class Main {
 
   public static void main(String[] args) throws Exception{
-
-    Method privateLookupIn;
-    try {
-      privateLookupIn = MethodHandles.class.getMethod("privateLookupIn", Class.class, MethodHandles.Lookup.class);
-      System.out.printf("+++++++++++++++");
-    } catch (NoSuchMethodException e) {
-      System.out.printf("--------------");
-      privateLookupIn = null;
-    }
+    System.out.println("^^"+int.class);
 /*
     InputStream is = Resources.getResourceAsStream("mybatis-config.xml");
     SqlSessionFactory sessionFactory = new SqlSessionFactoryBuilder().build(is);

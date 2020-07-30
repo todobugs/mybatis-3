@@ -79,10 +79,7 @@ public class JndiDataSourceFactory implements DataSourceFactory {
     return dataSource;
   }
 
-  /**
-   * 根据properties中属性信息获取以"env."开头的配置信息，并将其（去除"env."的key）键值对添加到contextProperties中
-   *
-   */
+  /** 根据properties中属性信息获取以"env."开头的配置信息，并将其（去除"env."的key）键值对添加到contextProperties中 */
   private static Properties getEnvProperties(Properties allProps) {
     final String PREFIX = ENV_PREFIX;
     Properties contextProperties = null;

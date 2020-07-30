@@ -16,31 +16,11 @@
 
 接下来，我们将通过源码详细介绍binding的执行逻辑。
 
-### 架构设计
 
-DataSource模块所在包路径为`org.apache.ibatis.datasource`，其具体划分如下：
 
-```java
-datasource
-- jndi
-  - JndiDataSourceFactory
-- pooled
-  - PooledConnection
-  - PooledDataSource
-  - PooledDataSourceFactory
-  - PoolState
-- unpooled
-  - UnpooledDataSource
-  - UnpooledDataSourceFactory
-- DataSourceException
-- DataSourceFactory
-```
+### 背景知识
 
-对应的类架构设计图如下：
-
-![](../asset/mybatis-datasource-architecture.png)
-
-在介绍MyBatis数据源实现之前，咱们先了解下JDK的DataSource。
+因为常见的数据源都会基于javax.sql.Datasource实现。Mybatis的数据源实现也是基于实现javax.sql.Datasource来设计的，也是在介绍MyBatis数据源实现之前，咱们先了解下JDK的DataSource。
 
 关于jdk中对DataSource在Oracle官网[DataSource介绍](https://docs.oracle.com/javase/8/docs/api/javax/sql/DataSource.html)有如下一段描述：
 
@@ -75,13 +55,45 @@ datasource
 
 根据 DataSource的实现必须包括一个公共的无参数构造函数的描述。
 
-这也是为什么池化数据源PoolDataSource与非池化数据源UnpooledDataSource都有显性定义无参构造函数的原因。
+这也是下面分析源码时看到的为什么池化数据源PoolDataSource与非池化数据源UnpooledDataSource都有显性定义无参构造函数的原因。
 
 关于DataSource就简单介绍到这里，有兴趣的同学可以查阅相关资料及jdk源码等。
 
 
 
-DataSourceFactory接口只提供两个方法：setProperties设置数据源相关属性；getDataSource获取数据源。
+### 架构设计
+
+DataSource模块所在包路径为`org.apache.ibatis.datasource`，其具体划分如下：
+
+```java
+datasource
+- jndi
+  - JndiDataSourceFactory
+- pooled
+  - PooledConnection
+  - PooledDataSource
+  - PooledDataSourceFactory
+  - PoolState
+- unpooled
+  - UnpooledDataSource
+  - UnpooledDataSourceFactory
+- DataSourceException
+- DataSourceFactory
+```
+
+对应的类架构设计图如下：
+
+![](../asset/mybatis-datasource-architecture.png)
+
+从架构图中，我们很显然发现，该架构采用经典的工厂方法设计模式（关于设计模式的介绍各位可以参阅本人的另一个设计模式专题，或者其他资料）
+
+
+
+### 源码解读
+
+#### DataSourceFactory
+
+`DataSourceFactory`接口只提供两个方法：`setProperties()`设置数据源相关属性；`getDataSource()`获取数据源。
 
 ```java
 /**
@@ -101,751 +113,706 @@ public interface DataSourceFactory {
 }
 ```
 
-MyBatis提供三种DataSourceFactory的实现方式：JndiDataSourceFactory，UnpooledDataSourceFactory和PooledDataSourceFactory。现对其逐一介绍。
+MyBatis提供三种`DataSourceFactory`的实现方式：`JndiDataSourceFactory`，`UnpooledDataSourceFactory`和`PooledDataSourceFactory`。现对其逐一介绍。
 
+#### UnpooledDataSourceFactory
 
-
-
-
-### 源码解读
-
-#### **MapperRegistry**
-
-老规矩，先上源码：
+`DataSourceFactory`的`UnpooledDataSourceFactory`的实现，首先会在其构造方法中直接实例化非池化的数据源`UnpooledDataSource` ，并 通过getDataSource()方法获取该数据源。`UnpooledDataSource`数据源中相关属性的填充则通过`setProperties()`进行设置。具体细节及说明，请参阅如下源码：
 
 ```java
-package org.apache.ibatis.binding;
+package org.apache.ibatis.datasource.unpooled;
 
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Set;
+import java.util.Properties;
+import javax.sql.DataSource;
 
-import org.apache.ibatis.builder.annotation.MapperAnnotationBuilder;
-import org.apache.ibatis.io.ResolverUtil;
-import org.apache.ibatis.session.Configuration;
-import org.apache.ibatis.session.SqlSession;
+import org.apache.ibatis.datasource.DataSourceException;
+import org.apache.ibatis.datasource.DataSourceFactory;
+import org.apache.ibatis.reflection.MetaObject;
+import org.apache.ibatis.reflection.SystemMetaObject;
 
+public class UnpooledDataSourceFactory implements DataSourceFactory {
 
-public class MapperRegistry {
-  /** 全局配置类 */
-  private final Configuration config;
-  /** 已添加的mapper代理类工厂 */
-  private final Map<Class<?>, MapperProxyFactory<?>> knownMappers = new HashMap<>();
-  /** 构造函数 */
-  public MapperRegistry(Configuration config) {
-    this.config = config;
-  }
+  private static final String DRIVER_PROPERTY_PREFIX = "driver.";
+  private static final int DRIVER_PROPERTY_PREFIX_LENGTH = DRIVER_PROPERTY_PREFIX.length();
 
-  /** 根据包名添加mapper */
-  public void addMappers(String packageName) {
-    //默认superType为Object.class,这样该包下的所有接口均会被添加到knownMappers中
-    addMappers(packageName, Object.class);
-  }
+  protected DataSource dataSource;
 
-  /** 根据指定包名及父类类型添加mapper */
-  public void addMappers(String packageName, Class<?> superType) {
-    /** 通过resolverUtil类判断查询packageName包下所有匹配superType的类型，并添加到一个set类型集合中 */
-    ResolverUtil<Class<?>> resolverUtil = new ResolverUtil<>();
-    resolverUtil.find(new ResolverUtil.IsA(superType), packageName);
-    Set<Class<? extends Class<?>>> mapperSet = resolverUtil.getClasses();
-    /** 循环遍历该集合，并将该mapperClass添加到knownMappers中 */
-    for (Class<?> mapperClass : mapperSet) {
-      addMapper(mapperClass);
-    }
+  public UnpooledDataSourceFactory() {
+    this.dataSource = new UnpooledDataSource();
   }
 
   /**
-   * 判断是否为接口，是的话才会生成代理对象
-   * 后续会在运行时该代理对象会被拦截器进行拦截处理
+   * 从properties中获取对应的配置信息
    */
-  public <T> void addMapper(Class<T> type) {
-    /** 1、判断传入的type是否是一个接口
-     *  2、判断knownMappers是否已经存在，若存在则抛出已存在异常。
-     *  3、设置是否加载完成标识，final会根据是否加载完成来区别是否删除该type的设置
-     *  4、将该接口put到knownMappers中
-     *  5、调用MapperAnnotationBuilder构造方法，并进行解析。（具体处理逻辑会在builder模块中展开）
-     */
-    if (type.isInterface()) {
-      if (hasMapper(type)) {
-        throw new BindingException("Type " + type + " is already known to the MapperRegistry.");
+  @Override
+  public void setProperties(Properties properties) {
+    Properties driverProperties = new Properties();
+    MetaObject metaDataSource = SystemMetaObject.forObject(dataSource);
+    for (Object key : properties.keySet()) {
+      String propertyName = (String) key;
+      if (propertyName.startsWith(DRIVER_PROPERTY_PREFIX)) {
+        //"driver."开头的为DataSource相关配置，均保存到driverProperties对象中，并最终会设置在metaDataSource中
+        String value = properties.getProperty(propertyName);
+        driverProperties.setProperty(propertyName.substring(DRIVER_PROPERTY_PREFIX_LENGTH), value);
+      } else if (metaDataSource.hasSetter(propertyName)) {
+        //普通配置属性直接设置在metaDataSource中
+        String value = (String) properties.get(propertyName);
+        //调用私有类型转换方法
+        Object convertedValue = convertValue(metaDataSource, propertyName, value);
+        metaDataSource.setValue(propertyName, convertedValue);
+      } else {
+        throw new DataSourceException("Unknown DataSource property: " + propertyName);
       }
-      boolean loadCompleted = false;
-      try {
-        knownMappers.put(type, new MapperProxyFactory<>(type));
-        MapperAnnotationBuilder parser = new MapperAnnotationBuilder(config, type);
-        parser.parse();
-        loadCompleted = true;
-      } finally {
-        if (!loadCompleted) {
-          knownMappers.remove(type);
+    }
+    /** driverProperties对象有值的情况下才设置 */
+    if (driverProperties.size() > 0) {
+      metaDataSource.setValue("driverProperties", driverProperties);
+    }
+  }
+
+  @Override
+  public DataSource getDataSource() {
+    return dataSource;
+  }
+
+  /** 根据propertyName的属性类型转换对应的value值，主要处理Integer，long及boolean三种 */
+  private Object convertValue(MetaObject metaDataSource, String propertyName, String value) {
+    Object convertedValue = value;
+    Class<?> targetType = metaDataSource.getSetterType(propertyName);
+    if (targetType == Integer.class || targetType == int.class) {
+      convertedValue = Integer.valueOf(value);
+    } else if (targetType == Long.class || targetType == long.class) {
+      convertedValue = Long.valueOf(value);
+    } else if (targetType == Boolean.class || targetType == boolean.class) {
+      convertedValue = Boolean.valueOf(value);
+    }
+    return convertedValue;
+  }
+
+}
+```
+
+#### PooledDataSourceFactory
+
+`PooledDataSourceFactory`实现则更为简单，他并没有复写`setProperties()`，`getDataSource()`方法，而是直接继承`UnpooledDataSourceFactory`，唯一区别就是构造方法中dataSource实例化对象为`PooledDataSource`，具体代码如下
+
+```java
+public class PooledDataSourceFactory extends UnpooledDataSourceFactory {
+
+  public PooledDataSourceFactory() {
+    //与UnpooledDataSourceFactory唯一的区别
+    this.dataSource = new PooledDataSource();
+  }
+}
+```
+
+#### JndiDataSourceFactory
+
+介绍`JndiDataSourceFactory`之前，先简单介绍下JNDI（全称为Java Naming and Directory Interface）， JNDI是 SUN 公司提供的一种标准的 Java 命名系统接口，JNDI 提供统一的客户端 API，通过不同的访问提供者接口 JNDI 服务供应接口 ( SPI ) 的实现，由管理者将 JNDI API 映射为特定的命名服务和目录系统，使得 Java 应用程序可以和这些命名服务和目录服务之间进行交互。其根本目的还是降低耦合性，提供部署的灵活性，降低维护成本。
+
+`JndiDataSourceFactory`实现与上述两种有所不同，从其命名的方式就可以知道DataSource的设置需要依赖具体的数据源厂商，因此不能在构造函数中进行实例化。所以只能从配置中读取相关信息，然后根据Context上下文环境，通过lookup的方式进行实例化。
+
+具体细节及说明，请看如下代码及相关注释：
+
+```java
+package org.apache.ibatis.datasource.jndi;
+
+import java.util.Map.Entry;
+import java.util.Properties;
+
+import javax.naming.Context;
+import javax.naming.InitialContext;
+import javax.naming.NamingException;
+import javax.sql.DataSource;
+
+import org.apache.ibatis.datasource.DataSourceException;
+import org.apache.ibatis.datasource.DataSourceFactory;
+
+/**
+ * Jndi数据源工厂类
+ */
+public class JndiDataSourceFactory implements DataSourceFactory {
+
+  public static final String INITIAL_CONTEXT = "initial_context";
+  public static final String DATA_SOURCE = "data_source";
+  public static final String ENV_PREFIX = "env.";
+
+  private DataSource dataSource;
+
+  /**
+   * 根据传入的properties传入的属性，获取以"env."开头的键值对属性，并存入env 对象中
+   * 如果env为null，则调用InitialContext无参构造函数
+   * 如果env不为null，则根据调用InitialContext 有参构造函数将env对象传入，进行初始化。
+   *
+   * 若传入的properties中存在initial_context属性，且存在data_source属性，则先根据initial_context作为key通过initCtx进行查找。
+   *    然后根据查找出的ctx对象继续以data_source为key进行查找，并将返回的对象转换为DataSource数据源
+   * 否则 如果properties中包含data_source 的key，则直接调用initCtx获取对象并返回DataSource数据源
+   * */
+  @Override
+  public void setProperties(Properties properties) {
+    try {
+      InitialContext initCtx;
+      Properties env = getEnvProperties(properties);
+      if (env == null) {
+        initCtx = new InitialContext();
+      } else {
+        initCtx = new InitialContext(env);
+      }
+
+      if (properties.containsKey(INITIAL_CONTEXT)
+          && properties.containsKey(DATA_SOURCE)) {
+        Context ctx = (Context) initCtx.lookup(properties.getProperty(INITIAL_CONTEXT));
+        dataSource = (DataSource) ctx.lookup(properties.getProperty(DATA_SOURCE));
+      } else if (properties.containsKey(DATA_SOURCE)) {
+        dataSource = (DataSource) initCtx.lookup(properties.getProperty(DATA_SOURCE));
+      }
+
+    } catch (NamingException e) {
+      throw new DataSourceException("There was an error configuring JndiDataSourceTransactionPool. Cause: " + e, e);
+    }
+  }
+
+  @Override
+  public DataSource getDataSource() {
+    return dataSource;
+  }
+
+  /** 根据properties中属性信息获取以"env."开头的配置信息，并将其（去除"env."的key）键值对添加到contextProperties中 */
+  private static Properties getEnvProperties(Properties allProps) {
+    final String PREFIX = ENV_PREFIX;
+    Properties contextProperties = null;
+    for (Entry<Object, Object> entry : allProps.entrySet()) {
+      String key = (String) entry.getKey();
+      String value = (String) entry.getValue();
+      if (key.startsWith(PREFIX)) {
+        if (contextProperties == null) {
+          contextProperties = new Properties();
         }
+        contextProperties.put(key.substring(PREFIX.length()), value);
       }
     }
-  }
-
-  /** 获取mapper代理对象 */
-  @SuppressWarnings("unchecked")
-  public <T> T getMapper(Class<T> type, SqlSession sqlSession) {
-    final MapperProxyFactory<T> mapperProxyFactory = (MapperProxyFactory<T>) knownMappers.get(type);
-    if (mapperProxyFactory == null) {
-      throw new BindingException("Type " + type + " is not known to the MapperRegistry.");
-    }
-    try {
-      return mapperProxyFactory.newInstance(sqlSession);
-    } catch (Exception e) {
-      throw new BindingException("Error getting mapper instance. Cause: " + e, e);
-    }
-  }
-
-  /**判断knownMappers中是否存在该类型的mapper代理工厂*/
-  public <T> boolean hasMapper(Class<T> type) {
-    return knownMappers.containsKey(type);
-  }
-
-  /** 主要用于测试，无需关注 */
-  public Collection<Class<?>> getMappers() {
-    return Collections.unmodifiableCollection(knownMappers.keySet());
+    return contextProperties;
   }
 }
 ```
 
-在Configuration实例化时，会通过如下方式进行实例化。
+
+
+介绍完DataSourceFactory的几种实现，下面咱们一起来看下DataSource的两种实现：`UnpooledDataSource` 和 `PooledDataSource`。由于`PooledDataSource`实现中会依赖`UnpooledDataSource`，所以咱们先看下`UnpooledDataSource`
+
+#### UnpooledDataSource
+
+首先看下`UnpooledDataSource`类的几个属性：
 
 ```java
-protected final MapperRegistry mapperRegistry = new MapperRegistry(this);
+
+  private ClassLoader driverClassLoader; //driver的类加载器
+  private Properties driverProperties; //数据库相关的驱动配置信息
+  private static Map<String, Driver> registeredDrivers = new ConcurrentHashMap<>(); //从DriverManager中已注册的驱动复制而来
+
+  private String driver; //驱动类全路径名称
+  private String url; //数据库连接地址
+  private String username; //数据库用户名
+  private String password; //数据库密码
+
+  private Boolean autoCommit; //是否自动提交
+  private Integer defaultTransactionIsolationLevel; //事务隔离级别
+  private Integer defaultNetworkTimeout; //默认网络超时时间
 ```
 
-从源码中可以看出，`MapperRegister`类只有两个属性，七个方法（包含一个构造方法）
-
-- config：该属性里面包含各种mybatis的配置信息，此处不再赘述。
-- knownMappers：该属性存放mapper接口并提供其代理对象（稍后介绍`MapperProxyFactory`）。
-- MapperRegistry：该构造方法注入config配置信息。
-- addMappers(String packageName)：根据包名添加该包下的所有mapper接口类，调用下述重载方法
-- addMappers(String packageName, Class<?> superType)：重载方法，根据包名及父类类型添加该包下的所有mapper接口类
-- getMapper：根据mapper类型及sqlsession获取对应mapper接口的代理对象。
-- hasMapper：根据mapper类型判断knownMappers中是否已存在，主要用于addMapper时校验。
-- addMapper：根据mapper类型将其添加到knownMappers中，该方法默认被`addMappers(String packageName, Class<?> superType)`循环调用，开发者亦可手动调用。
-
-
-
-#### **MapperProxyFactory**
+其中 registeredDrivers，该属性的设置时通过静态代码块进行初始化，从DriverManager中已注册的驱动中复制一份。代码如下：
 
 ```java
-package org.apache.ibatis.binding;
-
-import java.lang.reflect.Method;
-import java.lang.reflect.Proxy;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-
-import org.apache.ibatis.binding.MapperProxy.MapperMethodInvoker;
-import org.apache.ibatis.session.SqlSession;
-
-public class MapperProxyFactory<T> {
-  /** mapper接口 */
-  private final Class<T> mapperInterface;
-  /** method缓存 */
-  private final Map<Method, MapperMethodInvoker> methodCache = new ConcurrentHashMap<>();
-  /** 构造方法 */
-  public MapperProxyFactory(Class<T> mapperInterface) {
-    this.mapperInterface = mapperInterface;
-  }
-  /** 获取mapper接口 */
-  public Class<T> getMapperInterface() {
-    return mapperInterface;
-  }
-  /** 获取method缓存 */
-  public Map<Method, MapperMethodInvoker> getMethodCache() {
-    return methodCache;
-  }
-
-  /** 创建代理对象 */
-  public T newInstance(SqlSession sqlSession) {
-    final MapperProxy<T> mapperProxy = new MapperProxy<>(sqlSession, mapperInterface, methodCache);
-    return newInstance(mapperProxy);
-  }
-
-  /** 重载方法创建代理对象 */
-  protected T newInstance(MapperProxy<T> mapperProxy) {
-    return (T) Proxy.newProxyInstance(mapperInterface.getClassLoader(), new Class[] { mapperInterface }, mapperProxy);
+/** 初始化注册的驱动 */
+static {
+  Enumeration<Driver> drivers = DriverManager.getDrivers();
+  while (drivers.hasMoreElements()) {
+    Driver driver = drivers.nextElement();
+    registeredDrivers.put(driver.getClass().getName(), driver);
   }
 }
 ```
 
-MapperProxyFactory代码比较简单，持有mapperInterface，methodCache两个属性，一个构造方法（参数为mapper接口），两个获取代理对象的newInstance方法：
+然后是`UnpooledDataSource`的多个构造方法的重载，以及对`javax.sql.Datasource`接口的方法实现，还有就是对上述属性对应的getter/setter方法。内容比较简单不再描述。
 
-- MapperProxyFactory(Class<T> mapperInterface) 构造方法在执行MapperRegister#addMapper时添加到knownMappers的过程中进行实例化调用
-
-  ```java
-  knownMappers.put(type, new MapperProxyFactory<>(type));
-  ```
-
-- getMethodCache() ：获取methodCache信息，该methodCache在调用cachedInvoker时进行填充。
-
-- newInstance(SqlSession sqlSession)：通过sqlSession创建MappserProxy代理对象实例。
-
-- newInstance(MapperProxy<T> mapperProxy)：根据mapperProxy代理对象实例化代理对象（有点绕😊）
-
-#### **MapperProxy**
+这里重点要说下方法`UnpooledDataSource#doGetConnection(java.lang.String, java.lang.String)`，因为`UnpooledDataSource#getConnection()`所有重载方法最终都会调用该方法。`doGetConnection(java.lang.String, java.lang.String)`方法主要逻辑是组装用户名、密码及registeredDrivers到properties中，然后调用重载方法 `org.apache.ibatis.datasource.unpooled.UnpooledDataSource#doGetConnection(java.util.Properties)`，代码如下：
 
 ```java
-package org.apache.ibatis.binding;
+private Connection doGetConnection(String username, String password) throws SQLException {
+  Properties props = new Properties();
+  if (driverProperties != null) {
+    props.putAll(driverProperties);
+  }
+  if (username != null) {
+    props.setProperty("user", username);
+  }
+  if (password != null) {
+    props.setProperty("password", password);
+  }
+  return doGetConnection(props);
+}
+```
 
-import java.io.Serializable;
-import java.lang.invoke.MethodHandle;
-import java.lang.invoke.MethodHandles;
-import java.lang.invoke.MethodHandles.Lookup;
-import java.lang.invoke.MethodType;
-import java.lang.reflect.Constructor;
-import java.lang.reflect.InvocationHandler;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
-import java.util.Map;
+通过doGetConnection重载方法最终获取数据库连接，如下：
 
-import org.apache.ibatis.reflection.ExceptionUtil;
-import org.apache.ibatis.session.SqlSession;
-
-public class MapperProxy<T> implements InvocationHandler, Serializable {
-
-  private static final long serialVersionUID = -4724728412955527868L;
-  private static final int ALLOWED_MODES = MethodHandles.Lookup.PRIVATE | MethodHandles.Lookup.PROTECTED
-      | MethodHandles.Lookup.PACKAGE | MethodHandles.Lookup.PUBLIC;
-  private static final Constructor<Lookup> lookupConstructor;
-  private static final Method privateLookupInMethod;
-  private final SqlSession sqlSession;
-  private final Class<T> mapperInterface;
-  private final Map<Method, MapperMethodInvoker> methodCache;
-
-  /** MapperProxy构造方法，被MapperProxyFactory调用用于实例化代理对象 */
-  public MapperProxy(SqlSession sqlSession, Class<T> mapperInterface, Map<Method, MapperMethodInvoker> methodCache) {
-    this.sqlSession = sqlSession;
-    this.mapperInterface = mapperInterface;
-    this.methodCache = methodCache;
+```java
+private Connection doGetConnection(Properties properties) throws SQLException {
+    //初始化驱动
+    initializeDriver();
+    //根据数据库地址及相关属性获取connection
+    Connection connection = DriverManager.getConnection(url, properties);
+    //设置connection其他属性值，比如网络超时时间、是否自动提交、事务隔离级别等
+    configureConnection(connection);
+    //返回connection对象
+    return connection;
   }
 
-  /** 静态代码块初始化合适的MethodHandler */
-  static {
-    Method privateLookupIn;
-    try {
-      privateLookupIn = MethodHandles.class.getMethod("privateLookupIn", Class.class, MethodHandles.Lookup.class);
-    } catch (NoSuchMethodException e) {
-      privateLookupIn = null;
-    }
-    privateLookupInMethod = privateLookupIn;
-
-    Constructor<Lookup> lookup = null;
-    if (privateLookupInMethod == null) {
-      // JDK 1.8
+  /**
+   * 初始化驱动：
+   * 1、首先判断registeredDrivers是否已存在UnpooledDataSource定义的driver属性
+   * 2、如果不存在
+   *    2.1、如果driverClassLoader 不为空，则通过驱动类加载器获取驱动类型；否则通过Resources.classForName获取
+   *    2.2、根据驱动类类型创建对应的driver实例，并将该driver实例的代理对象添加到DriverManager以及registeredDrivers中
+   * 否则抛出驱动类初始化异常
+   */
+  private synchronized void initializeDriver() throws SQLException {
+    System.out.println("**************** driver："+driver);
+    if (!registeredDrivers.containsKey(driver)) {
+      Class<?> driverType;
       try {
-        lookup = MethodHandles.Lookup.class.getDeclaredConstructor(Class.class, int.class);
-        lookup.setAccessible(true);
-      } catch (NoSuchMethodException e) {
-        throw new IllegalStateException(
-            "There is neither 'privateLookupIn(Class, Lookup)' nor 'Lookup(Class, int)' method in java.lang.invoke.MethodHandles.",
-            e);
+        if (driverClassLoader != null) {
+          driverType = Class.forName(driver, true, driverClassLoader);
+        } else {
+          driverType = Resources.classForName(driver);
+        }
+        // DriverManager requires the driver to be loaded via the system ClassLoader.
+        // http://www.kfu.com/~nsayer/Java/dyn-jdbc.html
+        Driver driverInstance = (Driver)driverType.getDeclaredConstructor().newInstance();
+        DriverManager.registerDriver(new DriverProxy(driverInstance));
+        registeredDrivers.put(driver, driverInstance);
       } catch (Exception e) {
-        lookup = null;
+        throw new SQLException("Error setting driver on UnpooledDataSource. Cause: " + e);
       }
     }
-    lookupConstructor = lookup;
   }
-  /** 调用（根据method的类型声明判断方法调用类型） */
+
+  /** 设置connection其他属性值，比如网络超时时间、是否自动提交、事务隔离级别等 */
+  private void configureConnection(Connection conn) throws SQLException {
+    if (defaultNetworkTimeout != null) {
+      conn.setNetworkTimeout(Executors.newSingleThreadExecutor(), defaultNetworkTimeout);
+    }
+    if (autoCommit != null && autoCommit != conn.getAutoCommit()) {
+      conn.setAutoCommit(autoCommit);
+    }
+    if (defaultTransactionIsolationLevel != null) {
+      conn.setTransactionIsolation(defaultTransactionIsolationLevel);
+    }
+  }
+```
+
+至此，关于 `UnpooledDataSource`核心内容的介绍已完成。
+
+但是，我们在实际的开发实践中，并不会采用非池化的数据源。我相信熟悉JDBC编程的小伙伴应该知道，数据库连接的创建过程是比较耗时的，有可能数据库的连接创建耗时比真正的数据库执行还要长。而且数据库的链接数资源就像内存一样，既宝贵又有限。为了减少这种资源浪费，聪明的程序员提出连接池这种方案。这样就避免了大量的连接池创建耗时，是的连接可以重用。理想很丰满，现实很骨感。虽然这种方案解决了连接的创建问题，但是到底多大的连接数合适呢， 经过大量的应用实践，mybatis给出了比较好的方案，根据应用的业务量通过动态配置的方式来解决该问题。下面我们继续学习下PooledDataSource相关内容。
+
+介绍PooledDataSource之前，我们回顾下上面的架构图。从架构图中我们可以看出，PooledDataSource并不会直接维护`javax.sql.Connection`，而是通过PooledConnection来间接管理。
+
+#### PooledConnection
+
+`PooledConnection` 类实现了 `InvocationHandler` 接口，显然也是采用了JDK动态代理的模式。该类有三块核心点：拥有的相关属性、构造方法、及实现的invoker方法。具体说明及业务逻辑如下：
+
+```java
+class PooledConnection implements InvocationHandler {
+
+  private static final String CLOSE = "close"; //调用的是否为close关闭连接对象方法
+  private static final Class<?>[] IFACES = new Class<?>[] { Connection.class };
+
+  private final int hashCode; //连接的hash码
+  private final PooledDataSource dataSource; //连接对象所属的池化数据源
+  private final Connection realConnection; //真正的连接对象
+  private final Connection proxyConnection; //代理连接对象
+  private long checkoutTimestamp; //连接对象检出的时间戳
+  private long createdTimestamp; //连接对象创建时间戳
+  private long lastUsedTimestamp; //连接对象最后一次使用的时间戳
+  private int connectionTypeCode; //基于数据库URL、用户名、密码生成的连接类型code
+  private boolean valid; //连接对象是否有效
+  
+  /**
+   * 根据传入连接池数据源和连接对象 设计的简单连接对象构造方法(在连接对象被回收或激活调用时使用)
+   */
+  public PooledConnection(Connection connection, PooledDataSource dataSource) {
+    this.hashCode = connection.hashCode();
+    this.realConnection = connection;
+    this.dataSource = dataSource;
+    this.createdTimestamp = System.currentTimeMillis();
+    this.lastUsedTimestamp = System.currentTimeMillis();
+    this.valid = true;
+    this.proxyConnection = (Connection) Proxy.newProxyInstance(Connection.class.getClassLoader(), IFACES, this);
+  }
+  
   @Override
   public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
+    String methodName = method.getName();
+    // 判断方法是否为close，是则将调用pushConnection方法将该连接返回到空闲列表
+    if (CLOSE.equals(methodName)) {
+      dataSource.pushConnection(this);
+      return null;
+    }
     try {
-      if (Object.class.equals(method.getDeclaringClass())) {
-        return method.invoke(this, args);
-      } else {
-        return cachedInvoker(proxy, method, args).invoke(proxy, method, args, sqlSession);
+      if (!Object.class.equals(method.getDeclaringClass())) {
+        // issue #579 toString() should never fail
+        // throw an SQLException instead of a Runtime
+        // 检查连接对象是否有效
+        checkConnection();
       }
+      // 调用真正的连接并返回
+      return method.invoke(realConnection, args);
     } catch (Throwable t) {
       throw ExceptionUtil.unwrapThrowable(t);
     }
   }
-  /** 缓存调用 */
-  private MapperMethodInvoker cachedInvoker(Object proxy, Method method, Object[] args) throws Throwable {
-    try {
-      return methodCache.computeIfAbsent(method, m -> {
-        if (m.isDefault()) {
-          try {
-            if (privateLookupInMethod == null) {
-              return new DefaultMethodInvoker(getMethodHandleJava8(method));
-            } else {
-              return new DefaultMethodInvoker(getMethodHandleJava9(method));
-            }
-          } catch (IllegalAccessException | InstantiationException | InvocationTargetException
-              | NoSuchMethodException e) {
-            throw new RuntimeException(e);
-          }
-        } else {
-          return new PlainMethodInvoker(new MapperMethod(mapperInterface, method, sqlSession.getConfiguration()));
-        }
-      });
-    } catch (RuntimeException re) {
-      Throwable cause = re.getCause();
-      throw cause == null ? re : cause;
-    }
-  }
-  /** jdk1.9下调用 */
-  private MethodHandle getMethodHandleJava9(Method method)
-      throws NoSuchMethodException, IllegalAccessException, InvocationTargetException {
-    final Class<?> declaringClass = method.getDeclaringClass();
-    return ((Lookup) privateLookupInMethod.invoke(null, declaringClass, MethodHandles.lookup())).findSpecial(
-        declaringClass, method.getName(), MethodType.methodType(method.getReturnType(), method.getParameterTypes()),
-        declaringClass);
-  }
-  /** jdk1.8下调用 */
-  private MethodHandle getMethodHandleJava8(Method method)
-      throws IllegalAccessException, InstantiationException, InvocationTargetException {
-    final Class<?> declaringClass = method.getDeclaringClass();
-    return lookupConstructor.newInstance(declaringClass, ALLOWED_MODES).unreflectSpecial(method, declaringClass);
-  }
-
-  /** 内部接口MapperMethodInvoker */
-  interface MapperMethodInvoker {
-    Object invoke(Object proxy, Method method, Object[] args, SqlSession sqlSession) throws Throwable;
-  }
-
-  /** MapperMethodInvoker接口PlainMethodInvoker实现 */
-  private static class PlainMethodInvoker implements MapperMethodInvoker {
-    private final MapperMethod mapperMethod;
-
-    public PlainMethodInvoker(MapperMethod mapperMethod) {
-      super();
-      this.mapperMethod = mapperMethod;
-    }
-
-    @Override
-    public Object invoke(Object proxy, Method method, Object[] args, SqlSession sqlSession) throws Throwable {
-      /** 调用MapperMethod中的excute方法 */
-      return mapperMethod.execute(sqlSession, args);
-    }
-  }
-
-  /** MapperMethodInvoker接口 DefaultMethodInvoker 实现 */
-  private static class DefaultMethodInvoker implements MapperMethodInvoker {
-    private final MethodHandle methodHandle;
-
-    public DefaultMethodInvoker(MethodHandle methodHandle) {
-      super();
-      this.methodHandle = methodHandle;
-    }
-
-    @Override
-    public Object invoke(Object proxy, Method method, Object[] args, SqlSession sqlSession) throws Throwable {
-      return methodHandle.bindTo(proxy).invokeWithArguments(args);
-    }
-  }
 }
 ```
 
-MapperProxy代码较多，但主要功能还是比较清晰简单
+#### PoolState
 
-- 首先因项目运行环境的jdk可能不同，在启动时会通过静态代码块中判断采用哪种形式的MethodHandler，在jdk1.8环境下，会使用Constructor<Lookup> 方式，后续对应调用的方法为`getMethodHandleJava8(Method method)`，其他环境下采用Method方式，调用方法为`getMethodHandleJava9(Method method)`
-
-- 定义内部接口 `MapperMethodInvoker`，其唯一接口方法为：
-
-  ```java
-  Object invoke(Object proxy, Method method, Object[] args, SqlSession sqlSession) throws Throwable;
-  ```
-
-  该接口有两个私有实现类：PlainMethodInvoker，DefaultMethodInvoker
-
-  - PlainMethodInvoker 类通过MyBatis自定义的MapperMethod来执行对应的sqlSession 请求
-
-    ```java
-    //通过构造方法注入
-    private final MapperMethod mapperMethod;
-    
-    @Override
-        public Object invoke(Object proxy, Method method, Object[] args, SqlSession sqlSession) throws Throwable {
-          return mapperMethod.execute(sqlSession, args);
-        }
-    ```
-
-  - DefaultMethodInvoker 类采用jdk自带的MethodHandler方式，通过绑定代理类来调用sqlSession请求。
-
-    ```java
-    //通过构造方法注入
-    private final MethodHandle methodHandle;
-    @Override
-    public Object invoke(Object proxy, Method method, Object[] args, SqlSession sqlSession) throws Throwable {
-      return methodHandle.bindTo(proxy).invokeWithArguments(args);
-    }
-    ```
-
-- MapperProxy 实现InvocationHandler接口中的invoke方法：
-
-  - 首先判断传入的method声明类型是否为Object.class，若是则直接调用`method.invoke(this, args);`
-  - 否则调用MapperProxy私有方法 `cachedInvoker(Object proxy, Method method, Object[] args)`
-
-- cachedInvoker方法：
-
-  - 首先将传入method的加入到methodCache中（如果不存在时加入）。
-
-  - 根据该方法是否是isDefault类型执行不同的逻辑。
-
-    - 如果isDefault == true，则调用DefaultMethodInvoker（根据privateLookupInMethod是否为null来决定使用getMethodHandleJava8还是getMethodHandleJava9）
-
-    - 如果isDefault == false，则调用PlainMethodInvoker，关于MapperMethod介绍，请继续阅读
-
-      ```java
-      return new PlainMethodInvoker(new MapperMethod(mapperInterface, method, sqlSession.getConfiguration()));
-      ```
-
-#### **MapperMethod**
-
-`MapperMethod`类除了定义相关方法外，还定义了两个内部类：`SqlCommand` 和 `MethodSignature`。
-
-`SqlCommand` 类
-
-该类定义两个属性：String类型的name、`SqlCommandType` 类型的type及对应的get方法。`SqlCommandType` 为枚举类，其值为UNKNOWN, INSERT, UPDATE, DELETE, SELECT, FLUSH。
-
-`SqlCommand` 还提供了一个有参构造方法，如下：
+在`PooledDataSource`类中，还有个组件是PoolState，该对象主要管理连接对象相关的状态信息，比如空闲列表、活跃连接、超时时间等，详细见代码：
 
 ```java
-public SqlCommand(Configuration configuration, Class<?> mapperInterface, Method method) {
-  final String methodName = method.getName();
-  final Class<?> declaringClass = method.getDeclaringClass();
-  MappedStatement ms = resolveMappedStatement(mapperInterface, methodName, declaringClass,
-                                              configuration);
-  /** 判断ms是否为null
-       *  1、如果不为null，则获取对应的sql id 和执行类型并赋值给name、type
-       *  2、如果为null，则再次判断执行方法上是否有注解Flush，如果有则name设置为null，type设置为FLUSH；否则抛出BindingException
-       */
-  if (ms == null) {
-    if (method.getAnnotation(Flush.class) != null) {
-      name = null;
-      type = SqlCommandType.FLUSH;
-    } else {
-      throw new BindingException("Invalid bound statement (not found): "
-                                 + mapperInterface.getName() + "." + methodName);
-    }
-  } else {
-    name = ms.getId();
-    type = ms.getSqlCommandType();
-    if (type == SqlCommandType.UNKNOWN) {
-      throw new BindingException("Unknown execution method for: " + name);
-    }
+public class PoolState {
+
+  protected PooledDataSource dataSource; //连接池数据源(通过构造方法设置)
+
+  protected final List<PooledConnection> idleConnections = new ArrayList<>(); //空闲连接对象列表
+  protected final List<PooledConnection> activeConnections = new ArrayList<>(); //激活使用中的连接对象列表
+  protected long requestCount = 0; //请求数
+  protected long accumulatedRequestTime = 0; //累计连接时间
+  protected long accumulatedCheckoutTime = 0; //累计检出时间
+  protected long claimedOverdueConnectionCount = 0; //超时的连接个数
+  protected long accumulatedCheckoutTimeOfOverdueConnections = 0; //累计超时时间
+  protected long accumulatedWaitTime = 0; //累计等待时间
+  protected long hadToWaitCount = 0; //等待次数
+  protected long badConnectionCount = 0; //无效的连接数
+
+  public PoolState(PooledDataSource dataSource) {
+    this.dataSource = dataSource;
   }
 }
 ```
 
-该构造方法主要目的是根据configuration、mapperInterface、method参数获取对应的name、type值。以用于MapperMethod中excute方法的逻辑处理。构造方法中调用了SqlCommand定义的私有方法，方法的具体逻辑见如下源码注释。
+PoolState中个属性值会在不断调用、回收、及检测中更新值。
+
+#### PooledDataSource
+
+终于可以讲解PooledDataSource了， 这是DataSource章节中的重中之重。PooledDataSource代码较多，我们只需要关注几个核心内容:
+
+PooledDataSource 相关属性对象：
+
+```java
+
+  private final PoolState state = new PoolState(this); //数据源状态维护
+
+  private final UnpooledDataSource dataSource; //通过UnpooledDataSource获取真正的连接，该对象在构造方法中进行实例化
+
+  // OPTIONAL CONFIGURATION FIELDS
+  protected int poolMaximumActiveConnections = 10;//最大活跃数
+  protected int poolMaximumIdleConnections = 5; //最大空闲连接数
+  protected int poolMaximumCheckoutTime = 20000; //最大检出时间
+  protected int poolTimeToWait = 20000; //连接阻塞需要等待的时间
+  protected int poolMaximumLocalBadConnectionTolerance = 3; //可容忍的连接池最大无效连接数
+  protected String poolPingQuery = "NO PING QUERY SET"; //ping 语句
+  protected boolean poolPingEnabled; //是否允许发送检查sql语句
+  protected int poolPingConnectionsNotUsedFor; //连接超时的阈值，超过该阈值会发送一次连接测试sql，检查连接是否可用
+
+  private int expectedConnectionTypeCode; //期望数据源连接码：url+username+password 进行hash计算获取
+
+```
+
+forceCloseAll()，该方法关闭所有的空闲连接对象、激活连接对象。该方法会在设置数据源属性时调用，比如设置driver、url、username、password、autoCommint等
 
 ```java
 /**
-     * 1、根据接口全路径名及方法名组装成statementId
-     * 2、判断configuration 中是否存在该mappedStatement，若存在则直接返回
-     * 3、如果不存在则从父类接口中继续查找，如果找不到则返回null
-     * 4、如果入参路径就是方法所在的路径，则直接返回null
-     */
-    private MappedStatement resolveMappedStatement(Class<?> mapperInterface, String methodName,
-        Class<?> declaringClass, Configuration configuration) {
-      String statementId = mapperInterface.getName() + "." + methodName;
-      if (configuration.hasStatement(statementId)) {
-        return configuration.getMappedStatement(statementId);
-      } else if (mapperInterface.equals(declaringClass)) {
-        return null;
-      }
-      for (Class<?> superInterface : mapperInterface.getInterfaces()) {
-        if (declaringClass.isAssignableFrom(superInterface)) {
-          MappedStatement ms = resolveMappedStatement(superInterface, methodName,
-              declaringClass, configuration);
-          if (ms != null) {
-            return ms;
-          }
+* 分别递归倒序循环激活连接列表，空闲连接列表。
+* 将连接对象从对应列表移除，并将连接对象设置为无效。同时判断该真正连接是否设置自动提交，若不是则进行rollback回滚。
+*/
+public void forceCloseAll() {
+  synchronized (state) {
+    expectedConnectionTypeCode = assembleConnectionTypeCode(dataSource.getUrl(), dataSource.getUsername(), dataSource.getPassword());
+    for (int i = state.activeConnections.size(); i > 0; i--) {
+      try {
+        PooledConnection conn = state.activeConnections.remove(i - 1);
+        conn.invalidate();
+
+        Connection realConn = conn.getRealConnection();
+        if (!realConn.getAutoCommit()) {
+          realConn.rollback();
         }
+        realConn.close();
+      } catch (Exception e) {
+        // ignore
       }
-      return null;
     }
-```
+    for (int i = state.idleConnections.size(); i > 0; i--) {
+      try {
+        PooledConnection conn = state.idleConnections.remove(i - 1);
+        conn.invalidate();
 
-`MethodSignature`类
-
-MethodSignature类定义了method相关属性，具体内容参看如下源码。
-
-```java
-public static class MethodSignature {
-    /** 是否返回多值 */
-    private final boolean returnsMany;
-    /** 是否返回map */
-    private final boolean returnsMap;
-    /** 是否返回void类型 */
-    private final boolean returnsVoid;
-    /** 是否返回cursor */
-    private final boolean returnsCursor;
-    /** 是否返回optional */
-    private final boolean returnsOptional;
-    /** 返回类型 */
-    private final Class<?> returnType;
-    /** map主键 */
-    private final String mapKey;
-    /** 返回结果的handler索引 */
-    private final Integer resultHandlerIndex;
-    /** 返回rowBound索引 */
-    private final Integer rowBoundsIndex;
-    /** 参数名称解析器 */
-    private final ParamNameResolver paramNameResolver;
-
-    /** 构造函数，主要对属性进行赋值 */
-    public MethodSignature(Configuration configuration, Class<?> mapperInterface, Method method) {
-      Type resolvedReturnType = TypeParameterResolver.resolveReturnType(method, mapperInterface);
-      if (resolvedReturnType instanceof Class<?>) {
-        this.returnType = (Class<?>) resolvedReturnType;
-      } else if (resolvedReturnType instanceof ParameterizedType) {
-        this.returnType = (Class<?>) ((ParameterizedType) resolvedReturnType).getRawType();
-      } else {
-        this.returnType = method.getReturnType();
-      }
-      this.returnsVoid = void.class.equals(this.returnType);
-      this.returnsMany = configuration.getObjectFactory().isCollection(this.returnType) || this.returnType.isArray();
-      this.returnsCursor = Cursor.class.equals(this.returnType);
-      this.returnsOptional = Optional.class.equals(this.returnType);
-      this.mapKey = getMapKey(method);
-      this.returnsMap = this.mapKey != null;
-      this.rowBoundsIndex = getUniqueParamIndex(method, RowBounds.class);
-      this.resultHandlerIndex = getUniqueParamIndex(method, ResultHandler.class);
-      this.paramNameResolver = new ParamNameResolver(configuration, method);
-    }
-
-   // boolean及get方法略
-
-    private Integer getUniqueParamIndex(Method method, Class<?> paramType) {
-      Integer index = null;
-      final Class<?>[] argTypes = method.getParameterTypes();
-      for (int i = 0; i < argTypes.length; i++) {
-        if (paramType.isAssignableFrom(argTypes[i])) {
-          if (index == null) {
-            index = i;
-          } else {
-            throw new BindingException(method.getName() + " cannot have multiple " + paramType.getSimpleName() + " parameters");
-          }
+        Connection realConn = conn.getRealConnection();
+        if (!realConn.getAutoCommit()) {
+          realConn.rollback();
         }
+        realConn.close();
+      } catch (Exception e) {
+        // ignore
       }
-      return index;
-    }
-
-    /** 判断method的返回类型是否有注解主键，有则返回该主键value，没有返回null */
-    private String getMapKey(Method method) {
-      String mapKey = null;
-      if (Map.class.isAssignableFrom(method.getReturnType())) {
-        final MapKey mapKeyAnnotation = method.getAnnotation(MapKey.class);
-        if (mapKeyAnnotation != null) {
-          mapKey = mapKeyAnnotation.value();
-        }
-      }
-      return mapKey;
     }
   }
-```
-
-介绍完MapperMethod的两个内部类，我们回过了头来看下其自己的源码结构。
-
-MapperMethod有两个属性 command及method，这两个属性是在MapperMethod构造方法中通过调用各自类型的构造方法进行初始化，源码如下：
-
-```java
-private final SqlCommand command;
-private final MethodSignature method;
-
-public MapperMethod(Class<?> mapperInterface, Method method, Configuration config) {
-  this.command = new SqlCommand(config, mapperInterface, method);
-  this.method = new MethodSignature(config, mapperInterface, method);
+  if (log.isDebugEnabled()) {
+    log.debug("PooledDataSource forcefully closed/removed all connections.");
+  }
 }
 ```
 
-MapperMethod核心方法为execute，其逻辑如下：
+PooledDataSource#getConnection()获取连接对象并不是每次都会新创建新的连接，而是看空闲列表中是否存在空闲连接，有就直接获取一个。具体是通过调用popConnection方法获取连接对象。因为此处逻辑比较复杂，先看下逻辑图，然后再分析源码。
 
-```java
-/** MapperMethod 核心执行逻辑根据command类型：
-   *  insert、update、delete 分别调用对应的执行命令，同时调用rowCountResult 返回受影响的条数
-   *  select操作，其执行会根据是否有结果处理器及返回数据类型调用不同的方法
-   */
-  public Object execute(SqlSession sqlSession, Object[] args) {
-    Object result;
-    switch (command.getType()) {
-      case INSERT: {
-        Object param = method.convertArgsToSqlCommandParam(args);
-        result = rowCountResult(sqlSession.insert(command.getName(), param));
-        break;
-      }
-      case UPDATE: {
-        Object param = method.convertArgsToSqlCommandParam(args);
-        result = rowCountResult(sqlSession.update(command.getName(), param));
-        break;
-      }
-      case DELETE: {
-        Object param = method.convertArgsToSqlCommandParam(args);
-        result = rowCountResult(sqlSession.delete(command.getName(), param));
-        break;
-      }
-      case SELECT:
-        if (method.returnsVoid() && method.hasResultHandler()) {
-          executeWithResultHandler(sqlSession, args);
-          result = null;
-        } else if (method.returnsMany()) {
-          result = executeForMany(sqlSession, args);
-        } else if (method.returnsMap()) {
-          result = executeForMap(sqlSession, args);
-        } else if (method.returnsCursor()) {
-          result = executeForCursor(sqlSession, args);
+<img src="../asset/mybatis-datasource-popConnection.png" style="zoom:60%;" />
+
+上图为popConnection获取连接对象的主要流程图，当然，一些state相关的参数设置忽略了，详情看如下代码：
+
+```javascript
+/** 从连接池获取连接对象 */
+private PooledConnection popConnection(String username, String password) throws SQLException {
+  boolean countedWait = false;
+  PooledConnection conn = null;
+  long t = System.currentTimeMillis();
+  int localBadConnectionCount = 0;
+
+  while (conn == null) {
+    synchronized (state) {
+      if (!state.idleConnections.isEmpty()) {
+        // Pool has available connection
+        conn = state.idleConnections.remove(0);
+        if (log.isDebugEnabled()) {
+          log.debug("Checked out connection " + conn.getRealHashCode() + " from pool.");
+        }
+      } else {
+        // Pool does not have available connection
+        if (state.activeConnections.size() < poolMaximumActiveConnections) {
+          // Can create new connection
+          conn = new PooledConnection(dataSource.getConnection(), this);
+          if (log.isDebugEnabled()) {
+            log.debug("Created connection " + conn.getRealHashCode() + ".");
+          }
         } else {
-          Object param = method.convertArgsToSqlCommandParam(args);
-          result = sqlSession.selectOne(command.getName(), param);
-          if (method.returnsOptional()
-              && (result == null || !method.getReturnType().equals(result.getClass()))) {
-            result = Optional.ofNullable(result);
+          // Cannot create new connection
+          // 获取最早的一个活跃连接数
+          PooledConnection oldestActiveConnection = state.activeConnections.get(0);
+          long longestCheckoutTime = oldestActiveConnection.getCheckoutTime();
+          if (longestCheckoutTime > poolMaximumCheckoutTime) {
+            // Can claim overdue connection
+            state.claimedOverdueConnectionCount++;
+            state.accumulatedCheckoutTimeOfOverdueConnections += longestCheckoutTime;
+            state.accumulatedCheckoutTime += longestCheckoutTime;
+            state.activeConnections.remove(oldestActiveConnection);
+            if (!oldestActiveConnection.getRealConnection().getAutoCommit()) {
+              try {
+                oldestActiveConnection.getRealConnection().rollback();
+              } catch (SQLException e) {
+                /*
+                   Just log a message for debug and continue to execute the following
+                   statement like nothing happened.
+                   Wrap the bad connection with a new PooledConnection, this will help
+                   to not interrupt current executing thread and give current thread a
+                   chance to join the next competition for another valid/good database
+                   connection. At the end of this loop, bad {@link @conn} will be set as null.
+                 */
+                log.debug("Bad connection. Could not roll back");
+              }
+            }
+            //重置最早连接对象的相关信息，并设置相关属性
+            conn = new PooledConnection(oldestActiveConnection.getRealConnection(), this);
+            conn.setCreatedTimestamp(oldestActiveConnection.getCreatedTimestamp());
+            conn.setLastUsedTimestamp(oldestActiveConnection.getLastUsedTimestamp());
+            oldestActiveConnection.invalidate();
+            if (log.isDebugEnabled()) {
+              log.debug("Claimed overdue connection " + conn.getRealHashCode() + ".");
+            }
+          } else {
+            // Must wait
+            try {
+              if (!countedWait) {
+                state.hadToWaitCount++;
+                countedWait = true;
+              }
+              if (log.isDebugEnabled()) {
+                log.debug("Waiting as long as " + poolTimeToWait + " milliseconds for connection.");
+              }
+              long wt = System.currentTimeMillis();
+              //设置组着等待，等待时长为poolTimeToWait
+              state.wait(poolTimeToWait);
+              // 设置总的等待时间
+              state.accumulatedWaitTime += System.currentTimeMillis() - wt;
+            } catch (InterruptedException e) {
+              break;
+            }
           }
         }
-        break;
-      case FLUSH:
-        result = sqlSession.flushStatements();
-        break;
-      default:
-        throw new BindingException("Unknown execution method for: " + command.getName());
-    }
-    if (result == null && method.getReturnType().isPrimitive() && !method.returnsVoid()) {
-      throw new BindingException("Mapper method '" + command.getName()
-          + " attempted to return null from a method with a primitive return type (" + method.getReturnType() + ").");
-    }
-    return result;
-  }
-	
-  private Object rowCountResult(int rowCount) {
-    final Object result;
-    if (method.returnsVoid()) {
-      result = null;
-    } else if (Integer.class.equals(method.getReturnType()) || Integer.TYPE.equals(method.getReturnType())) {
-      result = rowCount;
-    } else if (Long.class.equals(method.getReturnType()) || Long.TYPE.equals(method.getReturnType())) {
-      result = (long)rowCount;
-    } else if (Boolean.class.equals(method.getReturnType()) || Boolean.TYPE.equals(method.getReturnType())) {
-      result = rowCount > 0;
-    } else {
-      throw new BindingException("Mapper method '" + command.getName() + "' has an unsupported return type: " + method.getReturnType());
-    }
-    return result;
-  }
-
-  private void executeWithResultHandler(SqlSession sqlSession, Object[] args) {
-    MappedStatement ms = sqlSession.getConfiguration().getMappedStatement(command.getName());
-    if (!StatementType.CALLABLE.equals(ms.getStatementType())
-        && void.class.equals(ms.getResultMaps().get(0).getType())) {
-      throw new BindingException("method " + command.getName()
-          + " needs either a @ResultMap annotation, a @ResultType annotation,"
-          + " or a resultType attribute in XML so a ResultHandler can be used as a parameter.");
-    }
-    Object param = method.convertArgsToSqlCommandParam(args);
-    if (method.hasRowBounds()) {
-      RowBounds rowBounds = method.extractRowBounds(args);
-      sqlSession.select(command.getName(), param, rowBounds, method.extractResultHandler(args));
-    } else {
-      sqlSession.select(command.getName(), param, method.extractResultHandler(args));
-    }
-  }
-
-  private <E> Object executeForMany(SqlSession sqlSession, Object[] args) {
-    List<E> result;
-    Object param = method.convertArgsToSqlCommandParam(args);
-    if (method.hasRowBounds()) {
-      RowBounds rowBounds = method.extractRowBounds(args);
-      result = sqlSession.selectList(command.getName(), param, rowBounds);
-    } else {
-      result = sqlSession.selectList(command.getName(), param);
-    }
-    // issue #510 Collections & arrays support
-    if (!method.getReturnType().isAssignableFrom(result.getClass())) {
-      if (method.getReturnType().isArray()) {
-        return convertToArray(result);
-      } else {
-        return convertToDeclaredCollection(sqlSession.getConfiguration(), result);
+      }
+      if (conn != null) {
+        // ping to server and check the connection is valid or not
+        // 通过ping验证连接的有效性，若有效则将该连接对象添加到活跃列表中，并将连接请求数+1，加总连接请求时间等。
+        if (conn.isValid()) {
+          if (!conn.getRealConnection().getAutoCommit()) {
+            conn.getRealConnection().rollback();
+          }
+          conn.setConnectionTypeCode(assembleConnectionTypeCode(dataSource.getUrl(), username, password));
+          conn.setCheckoutTimestamp(System.currentTimeMillis());
+          conn.setLastUsedTimestamp(System.currentTimeMillis());
+          state.activeConnections.add(conn);
+          state.requestCount++;
+          state.accumulatedRequestTime += System.currentTimeMillis() - t;
+        } else {
+          if (log.isDebugEnabled()) {
+            log.debug("A bad connection (" + conn.getRealHashCode() + ") was returned from the pool, getting another connection.");
+          }
+          //无效连接数+1
+          state.badConnectionCount++;
+          localBadConnectionCount++;
+          conn = null;
+          if (localBadConnectionCount > (poolMaximumIdleConnections + poolMaximumLocalBadConnectionTolerance)) {
+            if (log.isDebugEnabled()) {
+              log.debug("PooledDataSource: Could not get a good connection to the database.");
+            }
+            throw new SQLException("PooledDataSource: Could not get a good connection to the database.");
+          }
+        }
       }
     }
-    return result;
-  }
 
-  private <T> Cursor<T> executeForCursor(SqlSession sqlSession, Object[] args) {
-    Cursor<T> result;
-    Object param = method.convertArgsToSqlCommandParam(args);
-    if (method.hasRowBounds()) {
-      RowBounds rowBounds = method.extractRowBounds(args);
-      result = sqlSession.selectCursor(command.getName(), param, rowBounds);
-    } else {
-      result = sqlSession.selectCursor(command.getName(), param);
-    }
-    return result;
-  }
-
-  private <E> Object convertToDeclaredCollection(Configuration config, List<E> list) {
-    Object collection = config.getObjectFactory().create(method.getReturnType());
-    MetaObject metaObject = config.newMetaObject(collection);
-    metaObject.addAll(list);
-    return collection;
-  }
-
-  @SuppressWarnings("unchecked")
-  private <E> Object convertToArray(List<E> list) {
-    Class<?> arrayComponentType = method.getReturnType().getComponentType();
-    Object array = Array.newInstance(arrayComponentType, list.size());
-    if (arrayComponentType.isPrimitive()) {
-      for (int i = 0; i < list.size(); i++) {
-        Array.set(array, i, list.get(i));
-      }
-      return array;
-    } else {
-      return list.toArray((E[])array);
-    }
-  }
-
-  private <K, V> Map<K, V> executeForMap(SqlSession sqlSession, Object[] args) {
-    Map<K, V> result;
-    Object param = method.convertArgsToSqlCommandParam(args);
-    if (method.hasRowBounds()) {
-      RowBounds rowBounds = method.extractRowBounds(args);
-      result = sqlSession.selectMap(command.getName(), param, method.getMapKey(), rowBounds);
-    } else {
-      result = sqlSession.selectMap(command.getName(), param, method.getMapKey());
-    }
-    return result;
   }
 ```
 
-如上就是MapperMethod类文件中主要的逻辑介绍。MapperMethod会在实例化PlainMethodInvoker时进行实例化。
+介绍完获取连接对象，下面咱们看下PooledDataSource如何回收连接的。咱们也同样先看下业务逻辑图：
 
-#### BindingException
+<img src="../asset/mybatis-datasource-pushConnection.png" style="zoom:60%;" />
 
-绑定异常处理类，在Mybatis的绑定处理过程中，若出现异常情况则会抛出该类型的异常。BindingException本质上还是继承于RuntimeException类。
+具体逻辑及源码分析见代码：
 
 ```java
-public class BindingException extends PersistenceException {
-
-  private static final long serialVersionUID = 4300802238789381562L;
-
-  public BindingException() {
-    super();
-  }
-
-  public BindingException(String message) {
-    super(message);
-  }
-
-  public BindingException(String message, Throwable cause) {
-    super(message, cause);
-  }
-
-  public BindingException(Throwable cause) {
-    super(cause);
+protected void pushConnection(PooledConnection conn) throws SQLException {
+  synchronized (state) {
+    // 从活跃列表删除
+    state.activeConnections.remove(conn);
+    // 判断连接有效性
+    if (conn.isValid()) {
+      // 判断空闲列表是否小于最大值并且是否为同一个数据源
+      if (state.idleConnections.size() < poolMaximumIdleConnections && conn.getConnectionTypeCode() == expectedConnectionTypeCode) {
+        // 加总连接获取时间
+        state.accumulatedCheckoutTime += conn.getCheckoutTime();
+        // 若非自动提交，则回滚
+        if (!conn.getRealConnection().getAutoCommit()) {
+          conn.getRealConnection().rollback();
+        }
+        // 充值真实连接的相关属性，并添加到空闲列表中
+        PooledConnection newConn = new PooledConnection(conn.getRealConnection(), this);
+        state.idleConnections.add(newConn);
+        newConn.setCreatedTimestamp(conn.getCreatedTimestamp());
+        newConn.setLastUsedTimestamp(conn.getLastUsedTimestamp());
+        // 当前连接置为无效
+        conn.invalidate();
+        if (log.isDebugEnabled()) {
+          log.debug("Returned connection " + newConn.getRealHashCode() + " to pool.");
+        }
+        // 唤醒所有加锁等待
+        state.notifyAll();
+      } else {
+        // 加总连接获取时间
+        state.accumulatedCheckoutTime += conn.getCheckoutTime();
+        // 若非自动提交，则回滚
+        if (!conn.getRealConnection().getAutoCommit()) {
+          conn.getRealConnection().rollback();
+        }
+        // 关闭真正的连接
+        conn.getRealConnection().close();
+        if (log.isDebugEnabled()) {
+          log.debug("Closed connection " + conn.getRealHashCode() + ".");
+        }
+        // 将连接置为无效
+        conn.invalidate();
+      }
+    } else {
+      if (log.isDebugEnabled()) {
+        log.debug("A bad connection (" + conn.getRealHashCode() + ") attempted to return to the pool, discarding connection.");
+      }
+      state.badConnectionCount++;
+    }
   }
 }
 ```
+
+在popConnection、pushConnection中都会调用`conn.isValid()`判断连接是否有效，我们先看代码逻辑：
+
+```java
+public boolean isValid() {
+  //只有在valid为true，真实连接不为null且dataSource能够ping检测通过的条件下才会true
+  return valid && realConnection != null && dataSource.pingConnection(this);
+}
+//尝试ping进行验证conn的可用性
+protected boolean pingConnection(PooledConnection conn) {
+    boolean result = true;
+
+    try {
+      result = !conn.getRealConnection().isClosed();
+    } catch (SQLException e) {
+      if (log.isDebugEnabled()) {
+        log.debug("Connection " + conn.getRealHashCode() + " is BAD: " + e.getMessage());
+      }
+      result = false;
+    }
+
+    if (result) {
+      if (poolPingEnabled) {
+        if (poolPingConnectionsNotUsedFor >= 0 && conn.getTimeElapsedSinceLastUse() > poolPingConnectionsNotUsedFor) {
+          try {
+            if (log.isDebugEnabled()) {
+              log.debug("Testing connection " + conn.getRealHashCode() + " ...");
+            }
+            Connection realConn = conn.getRealConnection();
+            try (Statement statement = realConn.createStatement()) {
+              statement.executeQuery(poolPingQuery).close();
+            }
+            if (!realConn.getAutoCommit()) {
+              realConn.rollback();
+            }
+            result = true;
+            if (log.isDebugEnabled()) {
+              log.debug("Connection " + conn.getRealHashCode() + " is GOOD!");
+            }
+          } catch (Exception e) {
+            log.warn("Execution of ping query '" + poolPingQuery + "' failed: " + e.getMessage());
+            try {
+              conn.getRealConnection().close();
+            } catch (Exception e2) {
+              //ignore
+            }
+            result = false;
+            if (log.isDebugEnabled()) {
+              log.debug("Connection " + conn.getRealHashCode() + " is BAD: " + e.getMessage());
+            }
+          }
+        }
+      }
+    }
+    return result;
+  }
+```
+
+至此，DataSource模块相关的核心要点均已介绍完毕。
 
 ### **总结**
 
-虽然Binding模块代码不多，但在设计层面还是下足了功夫，比如在Mapper采用JDK动态代理模式，在Mapper注册时采用工厂模式等。
+DataSource模块也是采用了工厂方法、JDK动态代理等设计模式。
 
-关于MyBatis的Binding模块介绍至此告一段落。感谢垂阅，如有不妥之处请多多指教~
+关于MyBatis的DataSource模块介绍至此告一段落。感谢垂阅，如有不妥之处请多多指教~
 
 
 

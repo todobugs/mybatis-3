@@ -38,6 +38,9 @@ public class UnpooledDataSourceFactory implements DataSourceFactory {
     this.dataSource = new UnpooledDataSource();
   }
 
+  /**
+   * 从properties中获取对应的配置信息
+   */
   @Override
   public void setProperties(Properties properties) {
     Properties driverProperties = new Properties();
@@ -45,16 +48,20 @@ public class UnpooledDataSourceFactory implements DataSourceFactory {
     for (Object key : properties.keySet()) {
       String propertyName = (String) key;
       if (propertyName.startsWith(DRIVER_PROPERTY_PREFIX)) {
+        //"driver."开头的为DataSource相关配置，均保存到driverProperties对象中，并最终会设置在metaDataSource中
         String value = properties.getProperty(propertyName);
         driverProperties.setProperty(propertyName.substring(DRIVER_PROPERTY_PREFIX_LENGTH), value);
       } else if (metaDataSource.hasSetter(propertyName)) {
+        //普通配置属性直接设置在metaDataSource中
         String value = (String) properties.get(propertyName);
+        //调用私有类型转换方法
         Object convertedValue = convertValue(metaDataSource, propertyName, value);
         metaDataSource.setValue(propertyName, convertedValue);
       } else {
         throw new DataSourceException("Unknown DataSource property: " + propertyName);
       }
     }
+    /** driverProperties对象有值的情况下才设置 */
     if (driverProperties.size() > 0) {
       metaDataSource.setValue("driverProperties", driverProperties);
     }
@@ -65,6 +72,7 @@ public class UnpooledDataSourceFactory implements DataSourceFactory {
     return dataSource;
   }
 
+  /** 根据propertyName的属性类型转换对应的value值，主要处理Integer，long及boolean三种 */
   private Object convertValue(MetaObject metaDataSource, String propertyName, String value) {
     Object convertedValue = value;
     Class<?> targetType = metaDataSource.getSetterType(propertyName);

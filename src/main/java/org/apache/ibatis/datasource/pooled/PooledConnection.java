@@ -28,24 +28,29 @@ import org.apache.ibatis.reflection.ExceptionUtil;
  */
 class PooledConnection implements InvocationHandler {
 
-  private static final String CLOSE = "close";
+  private static final String CLOSE = "close"; //调用的是否为close关闭连接对象方法
   private static final Class<?>[] IFACES = new Class<?>[] { Connection.class };
 
-  private final int hashCode;
-  private final PooledDataSource dataSource;
-  private final Connection realConnection;
-  private final Connection proxyConnection;
-  private long checkoutTimestamp;
-  private long createdTimestamp;
-  private long lastUsedTimestamp;
-  private int connectionTypeCode;
-  private boolean valid;
+  private final int hashCode; //连接的hash码
+  private final PooledDataSource dataSource; //连接对象所属的池化数据源
+  private final Connection realConnection; //真正的连接对象
+  private final Connection proxyConnection; //代理连接对象
+  private long checkoutTimestamp; //连接对象检出的时间戳
+  private long createdTimestamp; //连接对象创建时间戳
+  private long lastUsedTimestamp; //连接对象最后一次使用的时间戳
+  private int connectionTypeCode; //基于数据库URL、用户名、密码生成的连接类型code
+  private boolean valid; //连接对象是否有效
 
   /**
    * Constructor for SimplePooledConnection that uses the Connection and PooledDataSource passed in.
    *
    * @param connection - the connection that is to be presented as a pooled connection
    * @param dataSource - the dataSource that the connection is from
+   */
+  /**
+   * 根据传入连接池数据源和连接对象 设计的简单连接对象构造方法(在连接对象被回收或激活调用时使用)
+   * @param connection
+   * @param dataSource
    */
   public PooledConnection(Connection connection, PooledDataSource dataSource) {
     this.hashCode = connection.hashCode();
@@ -70,6 +75,7 @@ class PooledConnection implements InvocationHandler {
    * @return True if the connection is usable
    */
   public boolean isValid() {
+    //只有在valid为true，真实连接不为null且dataSource能够ping检测通过的条件下才会true
     return valid && realConnection != null && dataSource.pingConnection(this);
   }
 
