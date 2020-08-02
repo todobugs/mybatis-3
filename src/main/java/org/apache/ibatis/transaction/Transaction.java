@@ -24,6 +24,10 @@ import java.sql.SQLException;
  *
  * @author Clinton Begin
  */
+
+/**
+ * 处理整个连接生命周期的各种操作，包括连接创建，事务提交、回滚及连接关闭等数据库事务相关的操作。
+ */
 public interface Transaction {
 
   /**
@@ -31,30 +35,35 @@ public interface Transaction {
    * @return DataBase connection
    * @throws SQLException
    */
+  /** 获取数据库连接 */
   Connection getConnection() throws SQLException;
 
   /**
    * Commit inner database connection.
    * @throws SQLException
    */
+  /** 数据提交 */
   void commit() throws SQLException;
 
   /**
    * Rollback inner database connection.
    * @throws SQLException
    */
+  /** 数据回滚 */
   void rollback() throws SQLException;
 
   /**
    * Close inner database connection.
    * @throws SQLException
    */
+  /** 关闭数据库连接 */
   void close() throws SQLException;
 
   /**
    * Get transaction timeout if set.
    * @throws SQLException
    */
+  /** 获取超时时间，如果设置的话，Mybatis默认的两种实现，均设置为null */
   Integer getTimeout() throws SQLException;
 
 }

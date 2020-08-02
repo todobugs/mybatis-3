@@ -39,10 +39,10 @@ public class JdbcTransaction implements Transaction {
 
   private static final Log log = LogFactory.getLog(JdbcTransaction.class);
 
-  protected Connection connection;
-  protected DataSource dataSource;
-  protected TransactionIsolationLevel level;
-  protected boolean autoCommit;
+  protected Connection connection; //连接对象
+  protected DataSource dataSource; //数据源
+  protected TransactionIsolationLevel level;  //事务隔离级别
+  protected boolean autoCommit; //是否自动提交
 
   public JdbcTransaction(DataSource ds, TransactionIsolationLevel desiredLevel, boolean desiredAutoCommit) {
     dataSource = ds;
@@ -85,28 +85,13 @@ public class JdbcTransaction implements Transaction {
   @Override
   public void close() throws SQLException {
     if (connection != null) {
+      // 非自动提交情况下，设置为自动提交
       resetAutoCommit();
       if (log.isDebugEnabled()) {
         log.debug("Closing JDBC Connection [" + connection + "]");
       }
+      // 关闭连接
       connection.close();
-    }
-  }
-
-  protected void setDesiredAutoCommit(boolean desiredAutoCommit) {
-    try {
-      if (connection.getAutoCommit() != desiredAutoCommit) {
-        if (log.isDebugEnabled()) {
-          log.debug("Setting autocommit to " + desiredAutoCommit + " on JDBC Connection [" + connection + "]");
-        }
-        connection.setAutoCommit(desiredAutoCommit);
-      }
-    } catch (SQLException e) {
-      // Only a very poorly implemented driver would fail here,
-      // and there's not much we can do about that.
-      throw new TransactionException("Error configuring AutoCommit.  "
-          + "Your driver may not support getAutoCommit() or setAutoCommit(). "
-          + "Requested setting: " + desiredAutoCommit + ".  Cause: " + e, e);
     }
   }
 
@@ -131,6 +116,7 @@ public class JdbcTransaction implements Transaction {
     }
   }
 
+  /**通过datasource获取数据库连接，然后属性level、autoCommit设置对应的事务隔离级别和是否自动提交*/
   protected void openConnection() throws SQLException {
     if (log.isDebugEnabled()) {
       log.debug("Opening JDBC Connection");
@@ -140,6 +126,23 @@ public class JdbcTransaction implements Transaction {
       connection.setTransactionIsolation(level.getLevel());
     }
     setDesiredAutoCommit(autoCommit);
+  }
+  /** 设置是否自动提交 */
+  protected void setDesiredAutoCommit(boolean desiredAutoCommit) {
+    try {
+      if (connection.getAutoCommit() != desiredAutoCommit) {
+        if (log.isDebugEnabled()) {
+          log.debug("Setting autocommit to " + desiredAutoCommit + " on JDBC Connection [" + connection + "]");
+        }
+        connection.setAutoCommit(desiredAutoCommit);
+      }
+    } catch (SQLException e) {
+      // Only a very poorly implemented driver would fail here,
+      // and there's not much we can do about that.
+      throw new TransactionException("Error configuring AutoCommit.  "
+        + "Your driver may not support getAutoCommit() or setAutoCommit(). "
+        + "Requested setting: " + desiredAutoCommit + ".  Cause: " + e, e);
+    }
   }
 
   @Override

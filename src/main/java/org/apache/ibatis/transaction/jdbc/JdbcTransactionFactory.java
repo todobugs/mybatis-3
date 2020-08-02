@@ -32,11 +32,13 @@ import org.apache.ibatis.transaction.TransactionFactory;
  */
 public class JdbcTransactionFactory implements TransactionFactory {
 
+  /** 通过数据库连接获取事务 */
   @Override
   public Transaction newTransaction(Connection conn) {
     return new JdbcTransaction(conn);
   }
 
+  /** 通过数据源、事务隔离级别、提交方式 获取事务 */
   @Override
   public Transaction newTransaction(DataSource ds, TransactionIsolationLevel level, boolean autoCommit) {
     return new JdbcTransaction(ds, level, autoCommit);
