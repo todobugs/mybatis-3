@@ -16,6 +16,7 @@
 package org.apache.ibatis.todobugs;
 
 import org.apache.ibatis.io.Resources;
+import org.apache.ibatis.logging.log4j.Log4jImpl;
 import org.apache.ibatis.session.SqlSession;
 import org.apache.ibatis.session.SqlSessionFactory;
 import org.apache.ibatis.session.SqlSessionFactoryBuilder;
@@ -28,15 +29,14 @@ import java.lang.reflect.Method;
 public class Main {
 
   public static void main(String[] args) throws Exception{
-    System.out.println("^^"+int.class);
-/*
     InputStream is = Resources.getResourceAsStream("mybatis-config.xml");
     SqlSessionFactory sessionFactory = new SqlSessionFactoryBuilder().build(is);
     SqlSession session = sessionFactory.openSession();
 
     UserInfo userInfo = session.selectOne("selectUserById",1);
-    System.out.println(userInfo.toString());*/
+    System.out.println(userInfo.toString());
 
 //    System.out.println(Main.class.getClassLoader());
+    System.out.println(Log4jImpl.class.getName());
   }
 }
