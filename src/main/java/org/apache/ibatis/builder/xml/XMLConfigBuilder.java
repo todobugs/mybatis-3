@@ -90,6 +90,7 @@ public class XMLConfigBuilder extends BaseBuilder {
     this.parser = parser;
   }
 
+  //配置文件的解析
   public Configuration parse() {
     if (parsed) {
       throw new BuilderException("Each XMLConfigBuilder can only be used once.");
@@ -154,6 +155,7 @@ public class XMLConfigBuilder extends BaseBuilder {
     }
   }
 
+  //载入日志配置
   private void loadCustomLogImpl(Properties props) {
     Class<? extends Log> logImpl = resolveClass(props.getProperty("logImpl"));
     configuration.setLogImpl(logImpl);

@@ -19,19 +19,18 @@ package org.apache.ibatis.logging;
  * @author Clinton Begin
  */
 public interface Log {
-
+  //是否启用debug
   boolean isDebugEnabled();
-
+  //是否启用trace
   boolean isTraceEnabled();
-
+  //错误日志级别输出方法
   void error(String s, Throwable e);
-
+  //重载错误日志级别输出方法
   void error(String s);
-
+  //debug日志级别输出方法
   void debug(String s);
-
+  //trace日志级别输出方法
   void trace(String s);
-
+  //warn日志级别输出方法
   void warn(String s);
-
 }

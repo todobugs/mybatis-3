@@ -60,6 +60,7 @@ public class SqlSessionFactoryBuilder {
     }
   }
 
+  //SqlSessionFactory 组建方法
   public SqlSessionFactory build(InputStream inputStream) {
     return build(inputStream, null, null);
   }

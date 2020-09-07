@@ -27,6 +27,12 @@ public class Log4j2Impl implements Log {
 
   private final Log log;
 
+  /**
+   * 根据传入的全限定类名获取log4j-api.jar 下对应的Logger对象：
+   * 若该对象为AbstractLogger的实例，则log的实例化为Log4j2AbstractLoggerImpl（Mybatis中Log接口的一种实现，该类会从LogFactory中获取Mybatis标识，在实例化时传入logger对象。日志输出时，需要传入全路径类名，日志界别，marker标识，messeage信息等）
+   * 否则 log的实例化对象为Log4j2LoggerImpl（该类的构造函数需要传入log4j-api中Logger类型参数，并在输入日志时传入Maker标识）
+   * @param clazz
+   */
   public Log4j2Impl(String clazz) {
     Logger logger = LogManager.getLogger(clazz);
 

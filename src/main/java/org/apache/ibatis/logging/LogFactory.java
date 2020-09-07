@@ -30,6 +30,12 @@ public final class LogFactory {
 
   private static Constructor<? extends Log> logConstructor;
 
+  /**
+   * 类加载时执行尝试设置使用的日志组件：
+   * 依次执行直到找到一个可用的，默认第一个调用的为slf4j
+   * 备注：第一个设置成功后，logConstructor 设置对应的值（每次判断该值是否为空来标识是否继续尝试）
+   * 注意注意：这是在默认加载时使用的方式，而对于用户自定一个则直接调用setImplementation（这样就绕过了系统默认的）
+   */
   static {
     tryImplementation(LogFactory::useSlf4jLogging);
     tryImplementation(LogFactory::useCommonsLogging);
@@ -55,38 +61,42 @@ public final class LogFactory {
     }
   }
 
+  /**
+   * 用户自定义采用的日志组件，根据用户在config.xml中setting节点配置的值来决定使用哪个
+   * @param clazz
+   */
   public static synchronized void useCustomLogging(Class<? extends Log> clazz) {
     setImplementation(clazz);
   }
-
+  //使用slf4j日志组件
   public static synchronized void useSlf4jLogging() {
     setImplementation(org.apache.ibatis.logging.slf4j.Slf4jImpl.class);
   }
-
+  //使用common-logging日志组件
   public static synchronized void useCommonsLogging() {
     setImplementation(org.apache.ibatis.logging.commons.JakartaCommonsLoggingImpl.class);
   }
-
+  //使用log4j日志组件
   public static synchronized void useLog4JLogging() {
     setImplementation(org.apache.ibatis.logging.log4j.Log4jImpl.class);
   }
-
+  //使用slf4j2日志组件
   public static synchronized void useLog4J2Logging() {
     setImplementation(org.apache.ibatis.logging.log4j2.Log4j2Impl.class);
   }
-
+  //使用jul下日志组件
   public static synchronized void useJdkLogging() {
     setImplementation(org.apache.ibatis.logging.jdk14.Jdk14LoggingImpl.class);
   }
-
+  //使用控制台标准输出
   public static synchronized void useStdOutLogging() {
     setImplementation(org.apache.ibatis.logging.stdout.StdOutImpl.class);
   }
-
+  //不使用日志组件
   public static synchronized void useNoLogging() {
     setImplementation(org.apache.ibatis.logging.nologging.NoLoggingImpl.class);
   }
-
+  //尝试启用日志组件方法
   private static void tryImplementation(Runnable runnable) {
     if (logConstructor == null) {
       try {
@@ -97,6 +107,10 @@ public final class LogFactory {
     }
   }
 
+  /**
+   * 根据传入的实现类，获取对应的构造函数candidate，并根据candidate获取log实例，如果正常执行完，则将candidate赋值给logConstructor
+   * @param implClass
+   */
   private static void setImplementation(Class<? extends Log> implClass) {
     try {
       Constructor<? extends Log> candidate = implClass.getConstructor(String.class);
@@ -109,5 +123,4 @@ public final class LogFactory {
       throw new LogException("Error setting Log implementation.  Cause: " + t, t);
     }
   }
-
 }
