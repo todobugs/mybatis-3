@@ -96,7 +96,7 @@ public final class LogFactory {
   public static synchronized void useNoLogging() {
     setImplementation(org.apache.ibatis.logging.nologging.NoLoggingImpl.class);
   }
-  //尝试启用日志组件方法
+  //尝试启用日志组件方法(如果logConstructor为空，则执行，否则跳过)
   private static void tryImplementation(Runnable runnable) {
     if (logConstructor == null) {
       try {
