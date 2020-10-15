@@ -24,8 +24,9 @@ import java.util.List;
  */
 public class InterceptorChain {
 
+  //定义拦截器list对象
   private final List<Interceptor> interceptors = new ArrayList<>();
-
+  //执行传入对象的所有拦截操作，并返回执行结果
   public Object pluginAll(Object target) {
     for (Interceptor interceptor : interceptors) {
       target = interceptor.plugin(target);
@@ -33,10 +34,12 @@ public class InterceptorChain {
     return target;
   }
 
+  //将拦截器加入到拦截器列表中
   public void addInterceptor(Interceptor interceptor) {
     interceptors.add(interceptor);
   }
 
+  //获取所有拦截器
   public List<Interceptor> getInterceptors() {
     return Collections.unmodifiableList(interceptors);
   }

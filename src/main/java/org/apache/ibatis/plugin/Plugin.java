@@ -30,16 +30,20 @@ import org.apache.ibatis.reflection.ExceptionUtil;
  */
 public class Plugin implements InvocationHandler {
 
-  private final Object target;
-  private final Interceptor interceptor;
-  private final Map<Class<?>, Set<Method>> signatureMap;
+  private final Object target; //目标对象
+  private final Interceptor interceptor; //拦截器
+  private final Map<Class<?>, Set<Method>> signatureMap; //签名方法map集合
 
+  //构造函数
   private Plugin(Object target, Interceptor interceptor, Map<Class<?>, Set<Method>> signatureMap) {
     this.target = target;
     this.interceptor = interceptor;
     this.signatureMap = signatureMap;
   }
 
+  /**
+   * 包装目标对象，如果对象对应的类有拦截注解，则通过Proxy进行代理包装并返回代理对象，否则直接返回当前目标对象
+   */
   public static Object wrap(Object target, Interceptor interceptor) {
     Map<Class<?>, Set<Method>> signatureMap = getSignatureMap(interceptor);
     Class<?> type = target.getClass();
@@ -53,6 +57,16 @@ public class Plugin implements InvocationHandler {
     return target;
   }
 
+  /**
+   * 实现Jdk动态代理的invoke方法
+   * 如果签名注解中的method集合不为空，且传入的method在该method集合中，则进行了拦截操作，并调用对应的拦截实现类方法
+   * 否则，直接invoke调用
+   * @param proxy
+   * @param method
+   * @param args
+   * @return
+   * @throws Throwable
+   */
   @Override
   public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
     try {
@@ -66,6 +80,12 @@ public class Plugin implements InvocationHandler {
     }
   }
 
+  /**
+   * 根据传入的拦截器获取拦截器注解
+   * 如果拦截器为null，则抛出无@Intercepts 注解的异常
+   * 获取拦截器中所有签名注解数组
+   * 循环所有签名数组，将sig添加到signatureMap中，并构造Method的Set集合，将sig构造的method添加到methods集合中
+   */
   private static Map<Class<?>, Set<Method>> getSignatureMap(Interceptor interceptor) {
     Intercepts interceptsAnnotation = interceptor.getClass().getAnnotation(Intercepts.class);
     // issue #251
@@ -86,6 +106,10 @@ public class Plugin implements InvocationHandler {
     return signatureMap;
   }
 
+  /**
+   * 根据传入的参数type，获取该类的所有接口Set集合
+   * 如果type不为null，且type接口在signatureMap中，则添加到set集合中
+   */
   private static Class<?>[] getAllInterfaces(Class<?> type, Map<Class<?>, Set<Method>> signatureMap) {
     Set<Class<?>> interfaces = new HashSet<>();
     while (type != null) {

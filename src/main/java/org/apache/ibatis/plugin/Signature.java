@@ -22,7 +22,7 @@ import java.lang.annotation.Target;
 
 /**
  * The annotation that indicate the method signature.
- *
+ * 拦截器方法签名注解类
  * @see Intercepts
  * @author Clinton Begin
  */
@@ -32,20 +32,21 @@ import java.lang.annotation.Target;
 public @interface Signature {
   /**
    * Returns the java type.
-   *
+   * type为执行器类型
    * @return the java type
    */
   Class<?> type();
 
   /**
    * Returns the method name.
-   *
+   * 要拦截的方法名
    * @return the method name
    */
   String method();
 
   /**
    * Returns java types for method argument.
+   * 被拦截方法的参数数组列表（切记参数列表的顺序要完全一致）
    * @return java types for method argument
    */
   Class<?>[] args();

@@ -37,7 +37,7 @@ public interface Interceptor {
   default Object plugin(Object target) {
     return Plugin.wrap(target, this);
   }
-  //读取配置文件中的属性信息
+  //读取配置文件中的属性信息（默认空实现，如果用户自定义了相关配置参数，则需要做相应处理）
   default void setProperties(Properties properties) {
     // NOP
   }
