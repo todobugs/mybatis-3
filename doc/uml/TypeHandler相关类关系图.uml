@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Diagram>
+  <ID>JAVA</ID>
+  <OriginalElement>org.apache.ibatis.type.TypeHandler</OriginalElement>
+  <nodes>
+    <node x="264.0" y="476.0">org.apache.ibatis.type.TypeAliasRegistry</node>
+    <node x="119.5" y="0.0">org.apache.ibatis.executor.resultset.ResultSetHandler</node>
+    <node x="465.0" y="552.0">org.apache.ibatis.type.MappedTypes</node>
+    <node x="0.0" y="552.0">org.apache.ibatis.executor.resultset.ResultSetWrapper</node>
+    <node x="230.0" y="400.0">org.apache.ibatis.type.UnknownTypeHandler</node>
+    <node x="0.0" y="400.0">org.apache.ibatis.type.IntegerTypeHandler</node>
+    <node x="128.5" y="319.0">org.apache.ibatis.type.BaseTypeHandler</node>
+    <node x="88.0" y="81.0">org.apache.ibatis.executor.resultset.DefaultResultSetHandler</node>
+    <node x="203.0" y="162.0">org.apache.ibatis.executor.resultset.DefaultResultSetHandler.UnMappedColumnAutoMapping</node>
+    <node x="0.0" y="162.0">org.apache.ibatis.executor.resultset.DefaultResultSetHandler.PendingRelation</node>
+    <node x="237.0" y="552.0">org.apache.ibatis.type.MappedJdbcTypes</node>
+    <node x="0.0" y="628.0">org.apache.ibatis.type.JdbcType</node>
+    <node x="234.5" y="238.0">org.apache.ibatis.type.TypeHandler</node>
+    <node x="0.0" y="476.0">org.apache.ibatis.type.TypeHandlerRegistry</node>
+    <node x="49.5" y="238.0">org.apache.ibatis.type.TypeReference</node>
+  </nodes>
+  <notes />
+  <edges>
+    <edge source="org.apache.ibatis.type.IntegerTypeHandler" target="org.apache.ibatis.type.BaseTypeHandler">
+      <point x="0.0" y="-15.5" />
+      <point x="105.0" y="375.0" />
+      <point x="174.25" y="375.0" />
+      <point x="-45.75" y="15.5" />
+    </edge>
+    <edge source="org.apache.ibatis.type.BaseTypeHandler" target="org.apache.ibatis.type.TypeReference">
+      <point x="-45.75" y="-15.5" />
+      <point x="174.25" y="294.0" />
+      <point x="132.0" y="294.0" />
+      <point x="0.0" y="15.5" />
+    </edge>
+    <edge source="org.apache.ibatis.type.BaseTypeHandler" target="org.apache.ibatis.type.TypeHandler">
+      <point x="45.75" y="-15.5" />
+      <point x="265.75" y="294.0" />
+      <point x="308.0" y="294.0" />
+      <point x="0.0" y="15.5" />
+    </edge>
+    <edge source="org.apache.ibatis.executor.resultset.DefaultResultSetHandler.UnMappedColumnAutoMapping" target="org.apache.ibatis.executor.resultset.DefaultResultSetHandler">
+      <point x="0.0" y="-15.5" />
+      <point x="339.5" y="137.0" />
+      <point x="279.25" y="137.0" />
+      <point x="63.75" y="15.5" />
+    </edge>
+    <edge source="org.apache.ibatis.executor.resultset.DefaultResultSetHandler" target="org.apache.ibatis.executor.resultset.ResultSetHandler">
+      <point x="0.0" y="-15.5" />
+      <point x="0.0" y="15.5" />
+    </edge>
+    <edge source="org.apache.ibatis.type.UnknownTypeHandler" target="org.apache.ibatis.type.BaseTypeHandler">
+      <point x="0.0" y="-15.5" />
+      <point x="335.0" y="375.0" />
+      <point x="265.75" y="375.0" />
+      <point x="45.75" y="15.5" />
+    </edge>
+    <edge source="org.apache.ibatis.executor.resultset.DefaultResultSetHandler.PendingRelation" target="org.apache.ibatis.executor.resultset.DefaultResultSetHandler">
+      <point x="0.0" y="-15.5" />
+      <point x="91.5" y="137.0" />
+      <point x="151.75" y="137.0" />
+      <point x="-63.75" y="15.5" />
+    </edge>
+  </edges>
+  <settings layout="Hierarchic Group" zoom="1.0" x="362.0" y="533.0" />
+  <SelectedNodes>
+    <node>org.apache.ibatis.executor.resultset.DefaultResultSetHandler</node>
+  </SelectedNodes>
+  <Categories>
+    <Category>Inner Classes</Category>
+  </Categories>
+  <SCOPE>All</SCOPE>
+  <VISIBILITY>public</VISIBILITY>
+</Diagram>
+
