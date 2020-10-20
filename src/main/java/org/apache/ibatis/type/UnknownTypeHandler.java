@@ -67,6 +67,15 @@ public class UnknownTypeHandler extends BaseTypeHandler<Object> {
     handler.setParameter(ps, i, parameter, jdbcType);
   }
 
+  /**
+   * 根据rs columnIndex 获取result
+   * 1.根据rs中的元数据及columnName参数进行解析，通过resolveTypeHandler获取对应的解析器类型（该方法中一定会给出一个解析器类型）
+   * 2.调用handler的getResult方法获取结果
+   * @param rs
+   * @param columnName
+   * @return
+   * @throws SQLException
+   */
   @Override
   public Object getNullableResult(ResultSet rs, String columnName)
       throws SQLException {
@@ -74,6 +83,15 @@ public class UnknownTypeHandler extends BaseTypeHandler<Object> {
     return handler.getResult(rs, columnName);
   }
 
+  /**
+   * 根据rs columnIndex 获取result
+   * 1.根据rs中的元数据及columnIndex参数进行解析，获取对应的解析器类型，如果没有找到对应的具体解析器，则采用ObjectTypeHandler
+   * 2.调用handler的getResult方法获取结果
+   * @param rs
+   * @param columnIndex
+   * @return
+   * @throws SQLException
+   */
   @Override
   public Object getNullableResult(ResultSet rs, int columnIndex)
       throws SQLException {

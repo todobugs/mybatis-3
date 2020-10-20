@@ -71,7 +71,7 @@ binding模块所在包路径为`org.apache.ibatis.binding`，类关系比较简�
 - MapperProxyFactory：Mapper代理工厂类
 - MapperProxy：Mapper代理类
 - MapperMethod：Mapper执行方法
-- BindingException：绑定异常类()
+- BindingException：绑定异常类
 
 其类之间的架构设计关系为：
 

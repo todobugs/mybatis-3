@@ -102,6 +102,7 @@ public class TypeAliasRegistry {
 
   @SuppressWarnings("unchecked")
   // throws class cast exception as well if types cannot be assigned
+  //当类型无法分配时会抛出类型转换异常
   public <T> Class<T> resolveAlias(String string) {
     try {
       if (string == null) {
@@ -138,6 +139,12 @@ public class TypeAliasRegistry {
     }
   }
 
+  /** 根据类名注册别名：
+   * 1.先获取类的短类名（即不包括类路径）
+   * 2.获取类的Alias注解
+   * 3.若Alias注解存在，则别名为注解的值
+   * 将类注册到 typeAliases 中
+  */
   public void registerAlias(Class<?> type) {
     String alias = type.getSimpleName();
     Alias aliasAnnotation = type.getAnnotation(Alias.class);
@@ -147,6 +154,17 @@ public class TypeAliasRegistry {
     registerAlias(alias, type);
   }
 
+
+  //将别名为alias，全路径名为value的类注册到 typeAliases 中
+  public void registerAlias(String alias, String value) {
+    try {
+      registerAlias(alias, Resources.classForName(value));
+    } catch (ClassNotFoundException e) {
+      throw new TypeException("Error registering type alias " + alias + " for " + value + ". Cause: " + e, e);
+    }
+  }
+
+  //别名注册逻辑
   public void registerAlias(String alias, Class<?> value) {
     if (alias == null) {
       throw new TypeException("The parameter alias cannot be null");
@@ -159,16 +177,9 @@ public class TypeAliasRegistry {
     typeAliases.put(key, value);
   }
 
-  public void registerAlias(String alias, String value) {
-    try {
-      registerAlias(alias, Resources.classForName(value));
-    } catch (ClassNotFoundException e) {
-      throw new TypeException("Error registering type alias " + alias + " for " + value + ". Cause: " + e, e);
-    }
-  }
-
   /**
    * @since 3.2.2
+   * 获取类型别名
    */
   public Map<String, Class<?>> getTypeAliases() {
     return Collections.unmodifiableMap(typeAliases);

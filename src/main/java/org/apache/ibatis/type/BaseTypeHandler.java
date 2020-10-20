@@ -51,6 +51,18 @@ public abstract class BaseTypeHandler<T> extends TypeReference<T> implements Typ
     this.configuration = c;
   }
 
+  /**
+   * 设置参数
+   * 1、若parameter为空：
+   *  1.1、若jdbcType为空，则抛出异常
+   *  1.2、ps根据索引位置设置对应的字段为空
+   * 2、若parameter不为空，调用非空参数设置方法进行参数设置
+   * @param ps
+   * @param i
+   * @param parameter
+   * @param jdbcType
+   * @throws SQLException
+   */
   @Override
   public void setParameter(PreparedStatement ps, int i, T parameter, JdbcType jdbcType) throws SQLException {
     if (parameter == null) {
@@ -106,6 +118,8 @@ public abstract class BaseTypeHandler<T> extends TypeReference<T> implements Typ
 
   /**
    * @param columnName Colunm name, when configuration <code>useColumnLabel</code> is <code>false</code>
+   *  根据ResultSet及columnName获取转换结果
+   *  请注意：当configuration中的useColumnLabel=false生效，useColumnLabel默认为true（请参看Configuration中的useColumnLabel属性）
    */
   public abstract T getNullableResult(ResultSet rs, String columnName) throws SQLException;
 

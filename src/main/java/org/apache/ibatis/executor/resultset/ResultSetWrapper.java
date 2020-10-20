@@ -40,14 +40,14 @@ import org.apache.ibatis.type.UnknownTypeHandler;
  */
 public class ResultSetWrapper {
 
-  private final ResultSet resultSet;
-  private final TypeHandlerRegistry typeHandlerRegistry;
-  private final List<String> columnNames = new ArrayList<>();
-  private final List<String> classNames = new ArrayList<>();
-  private final List<JdbcType> jdbcTypes = new ArrayList<>();
-  private final Map<String, Map<Class<?>, TypeHandler<?>>> typeHandlerMap = new HashMap<>();
-  private final Map<String, List<String>> mappedColumnNamesMap = new HashMap<>();
-  private final Map<String, List<String>> unMappedColumnNamesMap = new HashMap<>();
+  private final ResultSet resultSet;//返回结果集
+  private final TypeHandlerRegistry typeHandlerRegistry;//类型注册器
+  private final List<String> columnNames = new ArrayList<>();//字段名称 List集合
+  private final List<String> classNames = new ArrayList<>();//类全路径名称 List集合
+  private final List<JdbcType> jdbcTypes = new ArrayList<>();//jdbcTypes List集合
+  private final Map<String, Map<Class<?>, TypeHandler<?>>> typeHandlerMap = new HashMap<>(); //类型转换Map
+  private final Map<String, List<String>> mappedColumnNamesMap = new HashMap<>(); //被映射的数据库字段名Map
+  private final Map<String, List<String>> unMappedColumnNamesMap = new HashMap<>(); //未被映射的数据库字段名Map
 
   public ResultSetWrapper(ResultSet rs, Configuration configuration) throws SQLException {
     super();
@@ -91,7 +91,7 @@ public class ResultSetWrapper {
    * Gets the type handler to use when reading the result set.
    * Tries to get from the TypeHandlerRegistry by searching for the property type.
    * If not found it gets the column JDBC type and tries to get a handler for it.
-   *
+   * 通过propertyType、columnName 获取读取结果集是要使用的处理器
    * @param propertyType
    * @param columnName
    * @return
@@ -141,6 +141,12 @@ public class ResultSetWrapper {
     return null;
   }
 
+
+  /**
+   * 分别载入已映射的字段名称和未映射的字段名称
+   * @param resultMap
+   * @param columnPrefix
+   */
   private void loadMappedAndUnmappedColumnNames(ResultMap resultMap, String columnPrefix) throws SQLException {
     List<String> mappedColumnNames = new ArrayList<>();
     List<String> unmappedColumnNames = new ArrayList<>();
@@ -180,6 +186,7 @@ public class ResultSetWrapper {
     return resultMap.getId() + ":" + columnPrefix;
   }
 
+  //字段追加prefix前置
   private Set<String> prependPrefixes(Set<String> columnNames, String prefix) {
     if (columnNames == null || columnNames.isEmpty() || prefix == null || prefix.length() == 0) {
       return columnNames;

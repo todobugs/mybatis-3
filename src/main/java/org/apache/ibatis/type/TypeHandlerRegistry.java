@@ -54,11 +54,15 @@ import org.apache.ibatis.session.Configuration;
  */
 public final class TypeHandlerRegistry {
 
+  //jdbc类型转换器Map，初始化数据来源JdbcType枚举类
   private final Map<JdbcType, TypeHandler<?>>  jdbcTypeHandlerMap = new EnumMap<>(JdbcType.class);
+  //java类型转换器Map，数据原来源TypeHandlerRegistry构造函数的初始化
   private final Map<Type, Map<JdbcType, TypeHandler<?>>> typeHandlerMap = new ConcurrentHashMap<>();
+  //未知类型转换器，在TypeHandlerRegistry构造函数初始化时设值
   private final TypeHandler<Object> unknownTypeHandler;
+  //类型转换器Map，在TypeHandlerRegistry构造函数初始化时设值（初始化时：java类型，jdbc类型，类型处理器均不能为null）
   private final Map<Class<?>, TypeHandler<?>> allTypeHandlersMap = new HashMap<>();
-
+  //空类型转换器Map
   private static final Map<JdbcType, TypeHandler<?>> NULL_TYPE_HANDLER_MAP = Collections.emptyMap();
 
   private Class<? extends TypeHandler> defaultEnumTypeHandler = EnumTypeHandler.class;

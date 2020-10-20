@@ -145,8 +145,11 @@ public class Configuration {
   protected Class<?> configurationFactory;
 
   protected final MapperRegistry mapperRegistry = new MapperRegistry(this);
+  //实例化拦截器链属性
   protected final InterceptorChain interceptorChain = new InterceptorChain();
+  //类型转换注册器实例化
   protected final TypeHandlerRegistry typeHandlerRegistry = new TypeHandlerRegistry(this);
+  //类型别名注册实例化
   protected final TypeAliasRegistry typeAliasRegistry = new TypeAliasRegistry();
   protected final LanguageDriverRegistry languageRegistry = new LanguageDriverRegistry();
 
@@ -536,6 +539,7 @@ public class Configuration {
   /**
    * @since 3.2.2
    */
+  // 获取拦截器拦截器链中的拦截器列表
   public List<Interceptor> getInterceptors() {
     return interceptorChain.getInterceptors();
   }
@@ -578,12 +582,13 @@ public class Configuration {
     return MetaObject.forObject(object, objectFactory, objectWrapperFactory, reflectorFactory);
   }
 
+  // 创建参数处理器对象（创建过程或调用拦截器链，并对对象进行包装）
   public ParameterHandler newParameterHandler(MappedStatement mappedStatement, Object parameterObject, BoundSql boundSql) {
     ParameterHandler parameterHandler = mappedStatement.getLang().createParameterHandler(mappedStatement, parameterObject, boundSql);
     parameterHandler = (ParameterHandler) interceptorChain.pluginAll(parameterHandler);
     return parameterHandler;
   }
-
+  // 创建结果集处理器对象（创建过程或调用拦截器链，并对对象进行包装）
   public ResultSetHandler newResultSetHandler(Executor executor, MappedStatement mappedStatement, RowBounds rowBounds, ParameterHandler parameterHandler,
       ResultHandler resultHandler, BoundSql boundSql) {
     ResultSetHandler resultSetHandler = new DefaultResultSetHandler(executor, mappedStatement, parameterHandler, resultHandler, boundSql, rowBounds);
@@ -591,6 +596,7 @@ public class Configuration {
     return resultSetHandler;
   }
 
+  // 创建参数处理器对象（创建过程或调用拦截器链，并对对象进行包装）
   public StatementHandler newStatementHandler(Executor executor, MappedStatement mappedStatement, Object parameterObject, RowBounds rowBounds, ResultHandler resultHandler, BoundSql boundSql) {
     StatementHandler statementHandler = new RoutingStatementHandler(executor, mappedStatement, parameterObject, rowBounds, resultHandler, boundSql);
     statementHandler = (StatementHandler) interceptorChain.pluginAll(statementHandler);
@@ -601,6 +607,7 @@ public class Configuration {
     return newExecutor(transaction, defaultExecutorType);
   }
 
+  //根据传入的执行器类型创建对应的执行器实例 并调用拦截器链，并对对象进行包装
   public Executor newExecutor(Transaction transaction, ExecutorType executorType) {
     executorType = executorType == null ? defaultExecutorType : executorType;
     executorType = executorType == null ? ExecutorType.SIMPLE : executorType;
@@ -762,6 +769,7 @@ public class Configuration {
     return sqlFragments;
   }
 
+  //向拦截器链中添加拦截器
   public void addInterceptor(Interceptor interceptor) {
     interceptorChain.addInterceptor(interceptor);
   }

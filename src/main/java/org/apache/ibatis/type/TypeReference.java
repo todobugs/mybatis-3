@@ -27,20 +27,27 @@ import java.lang.reflect.Type;
  */
 public abstract class TypeReference<T> {
 
+  //原生类型
   private final Type rawType;
 
+  //构造函数，设置原生类型
   protected TypeReference() {
     rawType = getSuperclassTypeParameter(getClass());
   }
 
+  /**
+   * 功能描述：根据当前类的Class信息获取超类泛型的参数类型（比如IntegerHandlerType的超类泛型参数为Integer）
+   * @param clazz
+   * @return
+   */
   Type getSuperclassTypeParameter(Class<?> clazz) {
     Type genericSuperclass = clazz.getGenericSuperclass();
+    //如果传入类的泛型父类为Class的实例且不为TypeReference类，则已clazz的父类为参数递归调用getSuperclassTypeParameter；否则抛出异常
     if (genericSuperclass instanceof Class) {
       // try to climb up the hierarchy until meet something useful
       if (TypeReference.class != genericSuperclass) {
         return getSuperclassTypeParameter(clazz.getSuperclass());
       }
-
       throw new TypeException("'" + getClass() + "' extends TypeReference but misses the type parameter. "
         + "Remove the extension or add a type parameter to it.");
     }
@@ -50,14 +57,15 @@ public abstract class TypeReference<T> {
     if (rawType instanceof ParameterizedType) {
       rawType = ((ParameterizedType) rawType).getRawType();
     }
-
     return rawType;
   }
 
+  //获取构造方法中设置的原生类型
   public final Type getRawType() {
     return rawType;
   }
 
+  //toString方法返回rawType的toString方法
   @Override
   public String toString() {
     return rawType.toString();

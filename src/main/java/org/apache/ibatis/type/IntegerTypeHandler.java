@@ -22,29 +22,32 @@ import java.sql.SQLException;
 
 /**
  * @author Clinton Begin
+ * Integer的类型转换
  */
 public class IntegerTypeHandler extends BaseTypeHandler<Integer> {
 
+  //指定索引位置设置参数
   @Override
   public void setNonNullParameter(PreparedStatement ps, int i, Integer parameter, JdbcType jdbcType)
       throws SQLException {
     ps.setInt(i, parameter);
   }
 
+  //根据columnName获取结果
   @Override
   public Integer getNullableResult(ResultSet rs, String columnName)
       throws SQLException {
     int result = rs.getInt(columnName);
     return result == 0 && rs.wasNull() ? null : result;
   }
-
+  //根据columnIndex获取结果
   @Override
   public Integer getNullableResult(ResultSet rs, int columnIndex)
       throws SQLException {
     int result = rs.getInt(columnIndex);
     return result == 0 && rs.wasNull() ? null : result;
   }
-
+  //根据CallableStatement及columnIndex获取结果
   @Override
   public Integer getNullableResult(CallableStatement cs, int columnIndex)
       throws SQLException {
